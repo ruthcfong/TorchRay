@@ -15,6 +15,9 @@ appear in several papers, in order to support *reproducible research*.
   Fong, Patrick, Vedaldi.
   Proceedings of the International Conference on Computer Vision (ICCV), 2019.
 
+### Captum vs. TorchRay
+Facebook also released *[Captum](https://github.com/pytorch/captum)*, another interpretability library built on PyTorch. *Captum* provides broader support for other domains beyond vision and provides out-of-the-box interpretability methods for any model. While we also provide out-of-the-box methods, *TorchRay* primarily focuses on making interpretability research reproducible by providing a set of standard models and benchmarks, focusing on computer vision.
+
 ## Examples
 
 The package contains several usage examples in the
@@ -96,14 +99,29 @@ See the [CHANGELOG](CHANGELOG.md).
 
 ## Join the TorchRay community
 
-* Website: https://github.com/facebookresearch/TorchRay
-
 See the [CONTRIBUTING](CONTRIBUTING.md) file for how to help out.
 
 ## The team
 
 TorchRay has been primarily developed by Ruth C. Fong and Andrea Vedaldi.
 
+## Acknowledgements
+
+We'd like to acknowledge Jianming Zhang and Samuel Albanie for help on re-implementing the Pointing Game and Chris Olah and the OpenAI Clarity team for helpful discussions.
+
 ## License
 
 TorchRay is CC-BY-NC licensed, as found in the [LICENSE](LICENSE) file.
+
+## Reference
+
+If you use our library, please cite the following:
+```
+@InProceedings{fong_iccv_2019,
+author = {Fong, Ruth and Patrick, Mandela and Vedaldi, Andrea},
+title = {Understanding Deep Networks via Extremal Perturbations and Smooth Masks},
+booktitle = {The IEEE International Conference on Computer Vision (ICCV)},
+year = {2019}
+}
+```
+
