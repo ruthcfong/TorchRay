@@ -14,7 +14,8 @@ setup(
         'torchray': ['VERSION'],
         'torchray.benchmark': ['*.txt']
     },
-    url='http://pypi.python.org/pypi/torchray/',
+    url='https://github.com/facebookresearch/TorchRay',
+    download_url='https://github.com/facebookresearch/TorchRay/archive/v1.0.0.tar.gz',
     author='Andrea Vedaldi',
     author_email='vedaldi@fb.com',
     license='Creative Commons Attribution-Noncommercial 4.0 International',
