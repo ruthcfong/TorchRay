@@ -20,6 +20,7 @@ from torchray.attribution.excitation_backprop import update_resnet
 from torchray.attribution.grad_cam import grad_cam
 from torchray.attribution.gradient import gradient
 from torchray.attribution.guided_backprop import guided_backprop
+from torchray.attribution.norm_grad import norm_grad
 from torchray.attribution.rise import rise
 from torchray.benchmark.datasets import get_dataset
 from torchray.benchmark.models import get_model, get_transform
@@ -51,6 +52,7 @@ methods = [
     'grad_cam',
     'gradient',
     'guided_backprop',
+    'norm_grad',
     'rise',
     'extremal_perturbation'
 ]
@@ -103,6 +105,7 @@ class ExperimentExecutor():
             self.contrast_layer = 'avgpool'  # pool before fc layer
         else:
             assert False
+        self.normgrad_layer = self.gradcam_layer
 
         if self.experiment.dataset == 'voc_2007':
             subset = 'test'
@@ -309,6 +312,16 @@ class ExperimentExecutor():
                         self.model, x, class_id,
                         saliency_layer=self.saliency_layer,
                         contrast_layer=self.contrast_layer,
+                        resize=image_size,
+                        get_backward_gradient=get_pointing_gradient
+                    )
+                    point = _saliency_to_point(saliency)
+                    info['saliency'] = saliency
+
+                elif self.experiment.method == "norm_grad":
+                    saliency = norm_grad(
+                        self.model, x, class_id,
+                        saliency_layer=self.normgrad_layer,
                         resize=image_size,
                         get_backward_gradient=get_pointing_gradient
                     )
