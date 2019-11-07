@@ -20,7 +20,7 @@ from torchray.attribution.excitation_backprop import update_resnet
 from torchray.attribution.grad_cam import grad_cam
 from torchray.attribution.gradient import gradient
 from torchray.attribution.guided_backprop import guided_backprop
-from torchray.attribution.norm_grad import norm_grad
+from torchray.attribution.norm_grad import norm_grad, norm_grad_selective
 from torchray.attribution.rise import rise
 from torchray.benchmark.datasets import get_dataset
 from torchray.benchmark.models import get_model, get_transform
@@ -320,6 +320,16 @@ class ExperimentExecutor():
 
                 elif self.experiment.method == "norm_grad":
                     saliency = norm_grad(
+                        self.model, x, class_id,
+                        saliency_layer=self.normgrad_layer,
+                        resize=image_size,
+                        get_backward_gradient=get_pointing_gradient
+                    )
+                    point = _saliency_to_point(saliency)
+                    info['saliency'] = saliency
+
+                elif self.experiment.method == "norm_grad_selective":
+                    saliency = norm_grad_selective(
                         self.model, x, class_id,
                         saliency_layer=self.normgrad_layer,
                         resize=image_size,

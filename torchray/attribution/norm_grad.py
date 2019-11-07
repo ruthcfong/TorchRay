@@ -35,7 +35,7 @@ References:
                   `<https://arxiv.org/pdf/1910.08823.pdf>`__.
 """
 
-__all__ = ["norm_grad"]
+__all__ = ["norm_grad", "norm_grad_selective"]
 
 import torch
 from .common import saliency
@@ -68,10 +68,31 @@ def gradient_to_norm_grad_saliency(x):
     return saliency_map
 
 
+def gradient_to_norm_grad_selective_saliency(x):
+    return torch.norm(torch.clamp(x * x.grad, min=0), 2, 1,
+                      keepdim=True)
+
+
 def norm_grad(*args,
              saliency_layer,
              gradient_to_saliency=gradient_to_norm_grad_saliency,
              **kwargs):
+    r"""Grad-CAM method.
+
+    The function takes the same arguments as :func:`.common.saliency`, with
+    the defaults required to apply the Grad-CAM method, and supports the
+    same arguments and return values.
+    """
+    return saliency(*args,
+                    saliency_layer=saliency_layer,
+                    gradient_to_saliency=gradient_to_saliency,
+                    **kwargs,)
+
+
+def norm_grad_selective(*args,
+                        saliency_layer,
+                        gradient_to_saliency=gradient_to_norm_grad_selective_saliency,
+                        **kwargs):
     r"""Grad-CAM method.
 
     The function takes the same arguments as :func:`.common.saliency`, with
