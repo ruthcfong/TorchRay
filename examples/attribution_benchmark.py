@@ -20,6 +20,7 @@ from torchray.attribution.excitation_backprop import update_resnet
 from torchray.attribution.grad_cam import grad_cam
 from torchray.attribution.gradient import gradient
 from torchray.attribution.guided_backprop import guided_backprop
+from torchray.attribution.linear_approx import linear_approx
 from torchray.attribution.norm_grad import norm_grad, norm_grad_selective
 from torchray.attribution.rise import rise
 from torchray.benchmark.datasets import get_dataset
@@ -36,26 +37,72 @@ chunk = None
 
 datasets = [
     'voc_2007',
-    'coco'
+    # 'coco'
 ]
 
 archs = [
     'vgg16',
-    'resnet50'
+    # 'resnet50'
 ]
 
 methods = [
-    'center',
+    # 'center',
+    'contrastive_excitation_backprop',
+    # 'deconvnet',
+    'excitation_backprop',
+    'grad_cam',
+    'gradient',
+    'guided_backprop',
+    'linear_approx',
+    'norm_grad',
+    'norm_grad_selective',
+    # 'rise',
+    # 'extremal_perturbation'
+]
+
+backprop_based = [
     'contrastive_excitation_backprop',
     'deconvnet',
     'excitation_backprop',
     'grad_cam',
     'gradient',
     'guided_backprop',
+    'linear_approx',
     'norm_grad',
+    'norm_grad_selective',
+]
+
+perturbation_based = [
     'rise',
     'extremal_perturbation'
 ]
+
+if False:
+    layers = [
+        'layer4',
+        'layer3',
+        'layer2',
+        'layer1',
+        '',
+        # 'layer2.0.conv2',
+        # 'layer3.0.conv2',
+        # 'layer4.0.conv2',
+        # 'layer2.0.downsample.0',
+        # 'layer3.0.downsample.0',
+        # 'layer4.0.downsample.0',
+        # 'layer2.0.conv2',
+        # 'layer3.0.conv2',
+        # 'layer4.0.conv2',
+    ]
+else:
+    layers = [
+        'features.30',
+        'features.23',
+        'features.16',
+        'features.9',
+        'features.4',
+        '',
+    ]
 
 
 class ProcessingError(Exception):
@@ -95,13 +142,22 @@ class ExperimentExecutor():
         self.log = log
         self.seed = seed
 
+        if self.experiment.saliency_layer is None:
+            if self.experiment.arch == 'vgg16':
+                self.gradcam_layer = 'features.29'  # relu before pool5
+                self.saliency_layer = 'features.23'  # pool4
+            elif self.experiment.arch == 'resnet50':
+                self.gradcam_layer = 'layer4'
+                self.saliency_layer = 'layer3'  # 'layer3.5'  # res4a
+            else:
+                assert False
+        else:
+            self.gradcam_layer = self.experiment.saliency_layer
+            self.saliency_layer = self.experiment.saliency_layer
+
         if self.experiment.arch == 'vgg16':
-            self.gradcam_layer = 'features.29'  # relu before pool5
-            self.saliency_layer = 'features.23'  # pool4
             self.contrast_layer = 'classifier.4'  # relu7
         elif self.experiment.arch == 'resnet50':
-            self.gradcam_layer = 'layer4'
-            self.saliency_layer = 'layer3'  # 'layer3.5'  # res4a
             self.contrast_layer = 'avgpool'  # pool before fc layer
         else:
             assert False
@@ -171,7 +227,8 @@ class ExperimentExecutor():
             from torchray.benchmark.logging import mongo_connect
             self.db = mongo_connect(self.experiment.series)
 
-        self.device = get_device()
+        # self.device = get_device()
+        self.device = torch.device('cuda:3')
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
@@ -184,15 +241,13 @@ class ExperimentExecutor():
         # Some methods require patching the models further for
         # optimal performance.
         if self.experiment.arch == 'resnet50':
-            if any([e in self.experiment.method for e in [
-                    'contrastive_excitation_backprop',
-                    'deconvnet',
-                    'excitation_backprop',
-                    'grad_cam',
-                    'gradient',
-                    'guided_backprop'
-            ]]):
+            if self.experiment.method in perturbation_based:
+                pass
+            elif self.experiment.method in backprop_based:
+                # Patch all back-prop based methods.
                 self.model.avgpool = torch.nn.AvgPool2d((7, 7), stride=1)
+            else:
+                assert False
 
             if 'excitation_backprop' in self.experiment.method:
                 # Replace skip connection with EltwiseSum.
@@ -261,8 +316,9 @@ class ExperimentExecutor():
                 elif self.experiment.method == "gradient":
                     saliency = gradient(
                         self.model, x, class_id,
+                        saliency_layer=self.saliency_layer,
                         resize=image_size,
-                        smooth=0.02,
+                        smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
                     )
                     point = _saliency_to_point(saliency)
@@ -271,8 +327,9 @@ class ExperimentExecutor():
                 elif self.experiment.method == "deconvnet":
                     saliency = deconvnet(
                         self.model, x, class_id,
+                        saliency_layer=self.saliency_layer,
                         resize=image_size,
-                        smooth=0.02,
+                        smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
                     )
                     point = _saliency_to_point(saliency)
@@ -282,7 +339,7 @@ class ExperimentExecutor():
                     saliency = guided_backprop(
                         self.model, x, class_id,
                         resize=image_size,
-                        smooth=0.02,
+                        smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
                     )
                     point = _saliency_to_point(saliency)
@@ -293,6 +350,7 @@ class ExperimentExecutor():
                         self.model, x, class_id,
                         saliency_layer=self.gradcam_layer,
                         resize=image_size,
+                        smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
                     )
                     point = _saliency_to_point(saliency)
@@ -318,11 +376,21 @@ class ExperimentExecutor():
                     point = _saliency_to_point(saliency)
                     info['saliency'] = saliency
 
+                elif self.experiment.method == "linear_approx":
+                    saliency = linear_approx(
+                        self.model, x, class_id,
+                        saliency_layer=self.saliency_layer,
+                        resize=image_size,
+                        get_backward_gradient=get_pointing_gradient)
+                    point = _saliency_to_point(saliency)
+                    info['saliency'] = saliency
+
                 elif self.experiment.method == "norm_grad":
                     saliency = norm_grad(
                         self.model, x, class_id,
                         saliency_layer=self.normgrad_layer,
                         resize=image_size,
+                        smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
                     )
                     point = _saliency_to_point(saliency)
@@ -333,6 +401,7 @@ class ExperimentExecutor():
                         self.model, x, class_id,
                         saliency_layer=self.normgrad_layer,
                         resize=image_size,
+                        smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
                     )
                     point = _saliency_to_point(saliency)
@@ -469,6 +538,7 @@ class Experiment():
                  method,
                  arch,
                  dataset,
+                 saliency_layer=None,
                  root='',
                  chunk=None,
                  boom=False):
@@ -479,18 +549,19 @@ class Experiment():
         self.dataset = dataset
         self.chunk = chunk
         self.boom = boom
+        self.saliency_layer = saliency_layer
         self.pointing = float('NaN')
         self.pointing_difficult = float('NaN')
 
     def __str__(self):
         return (
-            f"{self.method},{self.arch},{self.dataset},"
+            f"{self.method},{self.saliency_layer},{self.arch},{self.dataset},"
             f"{self.pointing:.5f},{self.pointing_difficult:.5f}"
         )
 
     @property
     def name(self):
-        return f"{self.method}-{self.arch}-{self.dataset}"
+        return f"{self.method}-{self.saliency_layer}-{self.arch}-{self.dataset}"
 
     @property
     def path(self):
@@ -503,10 +574,15 @@ class Experiment():
     def load(self):
         with open(self.path, "r") as f:
             data = f.read()
-        method, arch, dataset, pointing, pointing_difficult = data.split(",")
+        if len(data.split(",")) == 5:
+            method, arch, dataset, pointing, pointing_difficult = data.split(",")
+        elif len(data.split(",")) == 6:
+            method, saliency_layer, arch, dataset, pointing, pointing_difficult = data.split(",")
+
         assert self.method == method
         assert self.arch == arch
         assert self.dataset == dataset
+        assert self.saliency_layer == saliency_layer
         self.pointing = float(pointing)
         self.pointing_difficult = float(pointing_difficult)
 
@@ -519,14 +595,22 @@ xmkdir(series_dir)
 
 for d in datasets:
     for a in archs:
-        for m in methods:
-            experiments.append(
-                Experiment(series=series,
-                           method=m,
-                           arch=a,
-                           dataset=d,
-                           chunk=chunk,
-                           root=series_dir))
+        for l in layers:
+            for m in methods:
+                try:
+                    experiments.append(
+                        Experiment(series=series,
+                                   method=m,
+                                   arch=a,
+                                   dataset=d,
+                                   saliency_layer=l,
+                                   chunk=chunk,
+                                   root=series_dir))
+                except:
+                    print(f'Error for {m}-{l}-{a}-{d}')
+                    pass
+                finally:
+                    pass
 
 if __name__ == "__main__":
     for e in experiments:
