@@ -338,6 +338,7 @@ class ExperimentExecutor():
                 elif self.experiment.method == "guided_backprop":
                     saliency = guided_backprop(
                         self.model, x, class_id,
+                        saliency_layer=self.saliency_layer,
                         resize=image_size,
                         smooth=0.02 if self.saliency_layer == '' else 0.0,
                         get_backward_gradient=get_pointing_gradient
