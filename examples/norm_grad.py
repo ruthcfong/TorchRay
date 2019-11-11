@@ -4,7 +4,7 @@ from torchray.benchmark import get_example_data, plot_example
 # Obtain example data.
 model, x, category_id, _ = get_example_data()
 
-# Grad-CAM backprop.
+# NormGrad backprop.
 saliency = norm_grad(model, x, category_id, saliency_layer='features.29')
 
 # Plots.
