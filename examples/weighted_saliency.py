@@ -22,5 +22,3 @@ saliency = weighted_saliency(norm_grad_selective,
 
 # Plots.
 plot_example(x, saliency, 'weighted NormGrad backprop', category_id)
-import matplotlib.pyplot as plt
-plt.show()
