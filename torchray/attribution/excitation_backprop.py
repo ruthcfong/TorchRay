@@ -138,6 +138,8 @@ import torch.nn as nn
 from torch.autograd import Function
 from torchvision.models.resnet import ResNet, Bottleneck, BasicBlock
 
+from torchray.utils import imsmooth
+
 from .common import Patch, Probe
 from .common import attach_debug_probes, get_backward_gradient, get_module
 from .common import saliency, resize_saliency
@@ -651,6 +653,9 @@ def contrastive_excitation_backprop(model,
                                     classifier_layer=None,
                                     resize=False,
                                     resize_mode='bilinear',
+                                    smooth=0,
+                                    context_builder=ExcitationBackpropContext,
+                                    gradient_to_saliency=gradient_to_contrastive_excitation_backprop_saliency,
                                     get_backward_gradient=get_backward_gradient,
                                     debug=False):
     """Contrastive excitation backprop.
@@ -689,23 +694,35 @@ def contrastive_excitation_backprop(model,
         at :attr:`saliency_layer` and an :class:`collections.OrderedDict`
         of :class:`Probe` objects for all modules in the model.
     """
-    debug_probes = attach_debug_probes(model, debug=debug)
+    # Clear any existing gradient.
+    if input.grad is not None:
+        input.grad.data.zero_()
 
     # Disable gradients for model parameters.
-    for param in model.parameters():
+    orig_requires_grad = {}
+    for name, param in model.named_parameters():
+        orig_requires_grad[name] = param.requires_grad
         param.requires_grad_(False)
 
     # Set model to eval mode.
     if model.training:
+        orig_is_training = True
         model.eval()
+    else:
+        orig_is_training = False
 
+    # Attach debug probes to every modeul.
+    debug_probes = attach_debug_probes(model, debug=debug)
+
+    # Get relevant layers.
     saliency_layer = get_module(model, saliency_layer)
     contrast_layer = get_module(model, contrast_layer)
     if classifier_layer is None:
         classifier_layer, _ = _get_classifier_layer(model)
     classifier_layer = get_module(model, classifier_layer)
 
-    with ExcitationBackpropContext():
+    with context_builder():
+        # Get contrastive signal.
         probe_contrast = Probe(contrast_layer, target='output')
         output = model(input)
         gradient = get_backward_gradient(output, target)
@@ -728,13 +745,32 @@ def contrastive_excitation_backprop(model,
         output = model(input)
         output.backward(gradient)
 
+    # Get saliency map from gradient.
     saliency_map = gradient_to_contrastive_excitation_backprop_saliency(
         probe_saliency.data[0])
 
+    # Resize saliency map.
+    saliency_map = resize_saliency(input, saliency_map, resize, resize_mode)
+
+    # Smooth saliency map.
+    if smooth > 0:
+        saliency_map = imsmooth(
+            saliency_map,
+            sigma = smooth * max(saliency_map.shape[2:]),
+            padding_mode='replicate'
+        )
+
+    # Remove probes.
     probe_saliency.remove()
     probe_contrast.remove()
 
-    saliency_map = resize_saliency(input, saliency_map, resize, resize_mode)
+    # Restore gradient saving for model parameters.
+    for name, param in model.named_parameters():
+        param.requires_grad_(orig_requires_grad[name])
+
+    # Restore model's original mode.
+    if orig_is_training:
+        model.train()
 
     if debug:
         return saliency_map, debug_probes
