@@ -38,9 +38,9 @@ def weighted_saliency(saliency_func,
         norm_saliency_map = normalize(saliency_map)
         norm_layer_weight = layer_weight / norm_term
         if accumulation == "sum":
-            cum_saliency_map += norm_layer_weight * norm_saliency_map
+            cum_saliency_map += norm_layer_weight * norm_saliency_map.cpu()
         elif accumulation == "product":
-            cum_saliency_map *= norm_saliency_map ** norm_layer_weight
+            cum_saliency_map *= norm_saliency_map.cpu() ** norm_layer_weight
         else:
             raise NotImplementedError(f"accumulation should be ['sum', "
                                       f"'product']. Instead, it's "
