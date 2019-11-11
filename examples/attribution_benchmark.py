@@ -263,16 +263,16 @@ class ExperimentExecutor():
         self.data_iterator = iter(self.loader)
 
     def _lazy_init(self):
+        if self.device is not None and isinstance(self.device, torch.device):
+            return
+
         if self.log:
             from torchray.benchmark.logging import mongo_connect
             self.db = mongo_connect(self.experiment.series)
 
         if self.device is not None:
-            if isinstance(self.device, torch.device):
-                self.device = torch.device(f'cuda:{self.device.index}')
-            else:
-                assert isinstance(self.device, int)
-                self.device = torch.device(f'cuda:{self.device}')
+            assert isinstance(self.device, int)
+            self.device = torch.device(f'cuda:{self.device}')
         else:
             self.device = get_device()
         torch.backends.cudnn.deterministic = True
@@ -502,8 +502,7 @@ class ExperimentExecutor():
         for itr, results in enumerate(self):
             all_results.append(results)
             self.aggregate(results)
-            # if itr % max(len(self) // 20, 1) == 0 or itr == len(self) - 1:
-            if True:
+            if itr % max(len(self) // 20, 1) == 0 or itr == len(self) - 1:
                 print("[{}/{}]".format(itr + 1, len(self)))
                 print(self)
 
