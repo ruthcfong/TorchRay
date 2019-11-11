@@ -21,7 +21,7 @@ def weighted_saliency(saliency_func,
     elif weights_strategy == "uniform":
         layer_weights = {layer_name: 1. for layer_name in layer_weights.keys()}
     elif weights_strategy == "linear":
-        weights = np.linspace(0, 1, len(layer_weights))[1:]
+        weights = np.linspace(0, 1, len(layer_weights) + 1)[1:]
         layer_weights = {layer_name: weights[i] for i, layer_name in enumerate(layer_weights.keys())}
     else:
         raise NotImplementedError(f"weights_strategy should be ['activation'"
@@ -31,9 +31,10 @@ def weighted_saliency(saliency_func,
 
     cum_saliency_map = 0
     for saliency_layer, layer_weight in layer_weights.items():
+        if 'resize' not in kwargs:
+            kwargs['resize'] = True
         saliency_map = saliency_func(*args,
                                      saliency_layer=saliency_layer,
-                                     resize=True,
                                      **kwargs)
         norm_saliency_map = normalize(saliency_map)
         norm_layer_weight = layer_weight / norm_term

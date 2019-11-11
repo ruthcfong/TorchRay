@@ -34,7 +34,8 @@ series = 'attribution_benchmarks'
 series_dir = os.path.join('data', series)
 log = 0
 seed = 0
-chunk = None
+chunk = None # range(1)
+save = True 
 
 datasets = [
     'voc_2007',
@@ -165,7 +166,7 @@ class ExperimentExecutor():
 
     def __init__(self, experiment, chunk=None, debug=0, log=0, seed=seed, device=None):
         self.experiment = experiment
-        self.device = None
+        self.device = device 
         self.model = None
         self.data = None
         self.loader = None
@@ -176,22 +177,27 @@ class ExperimentExecutor():
         self.seed = seed
 
         if self.experiment.saliency_layer is None:
-            if self.experiment.arch == 'vgg16':
-                if self.experiment.method in ['grad_cam', 'norm_grad', 'norm_grad_selective']:
-                    self.saliency_layer = 'features.29'  # relu before pool5
-                elif 'excitation_backprop' in self.experiment.method:
-                    self.saliency_layer = 'features.23'  # pool4
+            if self.experiment.weights_strategy is None:
+                if self.experiment.arch == 'vgg16':
+                    if self.experiment.method in ['grad_cam', 'norm_grad', 'norm_grad_selective']:
+                        self.saliency_layer = 'features.29'  # relu before pool5
+                    elif 'excitation_backprop' in self.experiment.method:
+                        self.saliency_layer = 'features.23'  # pool4
+                    else:
+                        self.saliency_layer = ''  # input
+                elif self.experiment.arch == 'resnet50':
+                    if self.experiment.method in ['grad_cam', 'norm_grad', 'norm_grad_selective']:
+                        self.saliency_layer = 'layer4'
+                    elif 'excitation_backprop' in self.experiment.method:
+                        self.saliency_layer = 'layer3'  # res4a
+                    else:
+                        self.saliency_layer = ''  # input
                 else:
-                    self.saliency_layer = ''  # input
-            elif self.experiment.arch == 'resnet50':
-                if self.experiment.method in ['grad_cam', 'norm_grad', 'norm_grad_selective']:
-                    self.gradcam_layer = 'layer4'
-                elif 'excitation_backprop' in self.experiment.method:
-                    self.saliency_layer = 'layer3'  # res4a
-                else:
-                    self.saliency_layer = ''  # input
+                    assert False
             else:
-                assert False
+                self.saliency_layer = None
+        else:
+            self.saliency_layer = self.experiment.saliency_layer
 
         if self.experiment.arch == 'vgg16':
             self.contrast_layer = 'classifier.4'  # relu7
@@ -262,8 +268,11 @@ class ExperimentExecutor():
             self.db = mongo_connect(self.experiment.series)
 
         if self.device is not None:
-            assert isinstance(self.device, int)
-            self.device = torch.device(f'cuda:{self.device}')
+            if isinstance(self.device, torch.device):
+                self.device = torch.device(f'cuda:{self.device.index}')
+            else:
+                assert isinstance(self.device, int)
+                self.device = torch.device(f'cuda:{self.device}')
         else:
             self.device = get_device()
         torch.backends.cudnn.deterministic = True
@@ -352,15 +361,19 @@ class ExperimentExecutor():
 
                 elif self.experiment.method in backprop_based:
                     saliency_func = saliency_funcs[self.experiment.method]
+                    args = [self.model, x, class_id]
+                    kwargs = {
+                        'resize': image_size,
+                        'get_backward_gradient': get_pointing_gradient,
+                    }
+                    if self.experiment.method == 'contrastive_excitation_backprop':
+                        kwargs['contrast_layer'] = self.contrast_layer
                     if self.experiment.weights_strategy is None:
+                        kwargs['smooth'] = 0.02 if self.saliency_layer == '' else 0.0
                         saliency = saliency_func(
-                            self.model,
-                            x,
-                            class_id,
+                            *args,
                             saliency_layer=self.saliency_layer,
-                            resize=image_size,
-                            smooth=0.02 if self.saliency_layer == '' else 0.0,
-                            get_backward_gradient=get_pointing_gradient,
+                            **kwargs,
                         )
                     else:
                         if self.experiment.weights_strategy not in ['accuracy', 'activation']:
@@ -371,19 +384,14 @@ class ExperimentExecutor():
                         saliency = weighted_saliency(
                             saliency_func,
                             lw,
-                            self.model,
-                            x,
-                            class_id,
+                            *args,
                             weights_strategy=self.experiment.weights_strategy,
                             accumulation=self.experiment.accumulation,
-                            saliency_layer=self.saliency_layer,
-                            resize=image_size,
-                            smooth=0.02 if self.saliency_layer == '' else 0.0,
-                            get_backward_gradient=get_pointing_gradient,
+                            **kwargs,
                         )
 
                     point = _saliency_to_point(saliency)
-                    info['saliency'] = saliency
+                    info['saliency'] = saliency.cpu()
 
                 elif self.experiment.method in perturbation_based:
                     assert self.weighting_strategy is None
@@ -394,7 +402,7 @@ class ExperimentExecutor():
                             rise_saliency = rise(self.model, x, resize=image_size, seed=self.seed)
                         saliency = rise_saliency[:, class_id, :, :].unsqueeze(1)
                         point = _saliency_to_point(saliency)
-                        info['saliency'] = saliency
+                        info['saliency'] = saliency.cpu()
 
                     elif self.experiment.method == "extremal_perturbation":
 
@@ -426,7 +434,7 @@ class ExperimentExecutor():
                         point = _saliency_to_point(saliency)
 
                         info = {
-                            'saliency': saliency,
+                            'saliency': saliency.cpu(),
                             'mask': mask,
                             'areas': areas,
                             'energy': energy
@@ -472,6 +480,11 @@ class ExperimentExecutor():
                         data_to_mongo(info)
                     )
 
+            del args
+            del kwargs
+            del saliency
+            torch.cuda.empty_cache()
+
             return results
 
         except Exception as ex:
@@ -484,12 +497,13 @@ class ExperimentExecutor():
         for class_id, hit in results['pointing_difficult'].items():
             self.pointing_difficult.aggregate(hit, class_id)
 
-    def run(self, save=True):
+    def run(self, save=save):
         all_results = []
         for itr, results in enumerate(self):
             all_results.append(results)
             self.aggregate(results)
-            if itr % max(len(self) // 20, 1) == 0 or itr == len(self) - 1:
+            # if itr % max(len(self) // 20, 1) == 0 or itr == len(self) - 1:
+            if True:
                 print("[{}/{}]".format(itr + 1, len(self)))
                 print(self)
 
@@ -505,11 +519,13 @@ class ExperimentExecutor():
 
     def __str__(self):
         return (
-            f"{self.experiment.method} {self.experiment.arch} "
-            f"{self.experiment.dataset} "
+            f"{self.experiment.method} "
+            f"{self.saliency_layer} "
+            f"{self.experiment.weights_strategy} "
+            f"{self.experiment.accumulation} "
+            f"{self.experiment.arch} "
+            f"{self.experiment.dataset}\n"
             f"pointing_game: {self.pointing}\n"
-            f"{self.experiment.method} {self.experiment.arch} "
-            f"{self.experiment.dataset} "
             f"pointing_game(difficult): {self.pointing_difficult}"
         )
 
@@ -579,7 +595,7 @@ class Experiment():
         elif len(data.split(",")) == 6:
             method, saliency_layer, arch, dataset, pointing, pointing_difficult = data.split(",")
             assert self.saliency_layer == saliency_layer
-        elif len(data.split(","))
+        elif len(data.split(",")) == 7:
             method, weights_strategy, accumulation, arch, dataset, pointing, pointing_difficult = data.split(",")
             assert self.weights_strategy == weights_strategy
             assert self.accumulation == accumulation
@@ -613,9 +629,9 @@ if __name__ == "__main__":
             for m in args.methods:
                 if args.weights_strategy is None:
                     if args.layers is None:
-                        args.layers = layers
+                        args.layers = layers[a]
                     else:
-                        assert len(args.arches) == 1
+                        assert len(args.archs) == 1
                     for l in args.layers:
                         try:
                             experiments.append(
