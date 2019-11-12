@@ -29,7 +29,15 @@ def weighted_saliency(saliency_func,
                                   f"instead, it's {weights_strategy}.")
     norm_term = np.sum(list(layer_weights.values()))
 
-    cum_saliency_map = 0
+    if accumulation == "sum":
+        cum_saliency_map = 0
+    elif accumulation == "product":
+        cum_saliency_map = 1
+    else:
+        raise NotImplementedError(f"accumulation should be ['sum', "
+                                  f"'product']. Instead, it's "
+                                  f"{accumulation}.")
+
     for saliency_layer, layer_weight in layer_weights.items():
         if 'resize' not in kwargs:
             kwargs['resize'] = True
