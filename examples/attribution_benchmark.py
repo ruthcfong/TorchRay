@@ -56,7 +56,9 @@ methods = [
     'excitation_backprop',
     'grad_cam',
     'gradient',
+    'gradient_sum',
     'guided_backprop',
+    'guided_backprop_sum',
     'linear_approx',
     'norm_grad',
     'norm_grad_selective',
@@ -70,7 +72,9 @@ backprop_based = [
     'excitation_backprop',
     'grad_cam',
     'gradient',
+    'gradient_sum',
     'guided_backprop',
+    'guided_backprop_sum',
     'linear_approx',
     'norm_grad',
     'norm_grad_selective',
@@ -254,13 +258,23 @@ accumulation = [
     'product'
 ]
 
+from torchray.attribution.linear_approx import gradient_to_linear_approx_saliency
+
+def gradient_sum(*args, **kwargs):
+    return gradient(*args, gradient_to_saliency=gradient_to_linear_approx_saliency, **kwargs)
+
+def guided_backprop_sum(*args, **kwargs):
+    return guided_backprop(*args, gradient_to_saliency=gradient_to_linear_approx_saliency, **kwargs)
+
 saliency_funcs = {
     'contrastive_excitation_backprop': contrastive_excitation_backprop,
     'deconvnet': deconvnet,
     'excitation_backprop': excitation_backprop,
     'grad_cam': grad_cam,
     'gradient': gradient,
+    'gradient_sum': gradient_sum,
     'guided_backprop': guided_backprop,
+    'guided_backprop_sum': guided_backprop_sum,
     'linear_approx': linear_approx,
     'norm_grad': norm_grad,
     'norm_grad_selective': norm_grad_selective,
@@ -753,11 +767,12 @@ if __name__ == "__main__":
     experiments = []
     xmkdir(series_dir)
 
+    provided_layers = args.layers is not None
     for d in args.datasets:
         for a in args.archs:
             for m in args.methods:
                 if args.weights_strategy is None:
-                    if args.layers is None:
+                    if not provided_layers:
                         args.layers = layers[a]
                     else:
                         assert len(args.archs) == 1
