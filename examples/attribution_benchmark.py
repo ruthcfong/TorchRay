@@ -30,6 +30,8 @@ from torchray.benchmark.pointing_game import PointingGameBenchmark
 from torchray.utils import imsc, get_device, xmkdir
 import torchray.attribution.extremal_perturbation as elp
 
+# v2: use weights from model finetuned on pascal
+# series = 'attribution_benchmarks_v2'
 series = 'attribution_benchmarks'
 series_dir = os.path.join('data', series)
 log = 0
@@ -92,11 +94,137 @@ layers = {
          'layer3',
          'layer2',
          'layer1',
+         ''
          ],
 }
 
 weights = {
+    'pointing_accuracy': {
+        'vgg16': {
+            'contrastive_excitation_backprop': {
+                'features.3': 0.75997,
+                'features.8': 0.75707,
+                'features.15': 0.75653,
+                'features.22': 0.7774,
+                'features.29': 0.82117,
+             },
+            'excitation_backprop': {
+                'features.3': 0.73782,
+                'features.8': 0.73756,
+                'features.15': 0.73681,
+                'features.22': 0.7532,
+                'features.29': 0.77578,
+             },
+            'grad_cam': {
+                'features.3': 0.59072,
+                'features.8': 0.5835,
+                'features.15': 0.55421,
+                'features.22': 0.58151,
+                'features.29': 0.86642,
+             },
+            'gradient': {
+                'features.3': 0.76415,
+                'features.8': 0.78116,
+                'features.15': 0.80649,
+                'features.22': 0.82091,
+                'features.29': 0.39528,
+             },
+            'guided_backprop': {
+                'features.3': 0.75383,
+                'features.8': 0.72592,
+                'features.15': 0.70552,
+                'features.22': 0.73107,
+                'features.29': 0.25494,
+             },
+            'linear_approx': {
+                'features.3': 0.81499,
+                'features.8': 0.83012,
+                'features.15': 0.8311,
+                'features.22': 0.84617,
+                'features.29': 0.86486,
+             },
+            'norm_grad': {
+                'features.3': 0.78859,
+                'features.8': 0.8101,
+                'features.15': 0.81867,
+                'features.22': 0.81925,
+                'features.29': 0.77689,
+             },
+            'norm_grad_selective': {
+                'features.3': 0.81393,
+                'features.8': 0.81372,
+                'features.15': 0.81942,
+                'features.22': 0.84845,
+                'features.29': 0.86022,
+             },
+        },
+        'resnet50': {
+            'contrastive_excitation_backprop': {
+                'layer1': 0.88073,
+                'layer2': 0.89327,
+                'layer3': 0.90722,
+                'layer4': 0.89735,
+            },
+            'excitation_backprop': {
+                'layer1': 0.82129,
+                'layer2': 0.83304,
+                'layer3': 0.84524,
+                'layer4': 0.84555,
+            },
+            'grad_cam': {
+                'layer1': 0.54451,
+                'layer2': 0.52873,
+                'layer3': 0.66292,
+                'layer4': 0.90372,
+            },
+            'gradient': {
+                'layer1': 0.78599,
+                'layer2': 0.83924,
+                'layer3': 0.82786,
+                'layer4': 0.18019,
+            },
+            'guided_backprop': {  # 
+                'layer1': 0.76874,
+                'layer2': 0.77696,
+                'layer3': 0.82317,
+                'layer4': 0.18019,
+            },
+            'linear_approx': {
+                'layer1': 0.83281,
+                'layer2': 0.85528,
+                'layer3': 0.85595,
+                'layer4': 0.90241,
+            },
+            'norm_grad': {
+                'layer1': 0.81853,
+                'layer2': 0.84045,
+                'layer3': 0.84613,
+                'layer4': 0.78765,
+            },
+            'norm_grad_selective': {
+                'layer1': 0.8227,
+                'layer2': 0.86304,
+                'layer3': 0.86891,
+                'layer4': 0.87439,
+            },
+        },
+    },
     'activation': {
+        'vgg16': {
+            'features.3': 0.2119383764047884,
+            'features.8': 0.3225606074029479,
+            'features.15': 0.3907056723433652,
+            'features.22': 0.0674916783223005,
+            'features.29': 0.0073036655265981,
+        },
+        'resnet50': {
+            'layer1': 0.1698746686351632,
+            'layer2': 0.1950209363640008,
+            'layer3': 0.1930607604361503,
+            'layer4': 0.4420436345646859,
+        }
+    },
+    'activation_imagenet': {
         'vgg16': {
             'features.3': 0.1533106022599574,
             'features.8': 0.2196877151286012,
@@ -376,10 +504,12 @@ class ExperimentExecutor():
                             **kwargs,
                         )
                     else:
-                        if self.experiment.weights_strategy not in ['accuracy', 'activation']:
-                            lw = weights['activation'][self.experiment.arch]
-                        else:
+                        if self.experiment.weights_strategy == 'pointing_accuracy':
+                            lw = weights[self.experiment.weights_strategy][self.experiment.arch][self.experiment.method]
+                        elif self.experiment.weights_strategy in ['accuracy', 'activation']:
                             lw = weights[self.experiment.weights_strategy][self.experiment.arch]
+                        else:
+                            lw = weights['activation'][self.experiment.arch]
 
                         saliency = weighted_saliency(
                             saliency_func,

@@ -16,7 +16,7 @@ def weighted_saliency(saliency_func,
                       **kwargs):
     if not isinstance(layer_weights, dict):
         raise TypeError(f"layer_weights not a dict; it's a {type(layer_weights)}")
-    if weights_strategy in ["activation", "accuracy"]:
+    if "activation" in weights_strategy or "accuracy" in weights_strategy:
         pass
     elif weights_strategy == "uniform":
         layer_weights = {layer_name: 1. for layer_name in layer_weights.keys()}
