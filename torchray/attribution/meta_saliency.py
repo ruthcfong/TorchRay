@@ -1,17 +1,38 @@
-import copy
 import torch
 import torch.nn.functional as F
 
 
-def meta_saliency(#saliency_func,
+def meta_saliency(saliency_func,
                   model,
                   x,
                   target,
                   lr=1e-4,
                   freeze_model=True,
+                  negate_loss=False,
                   **kwargs):
+    """Update the model with one SGD step and then apply a saliency method.
+
+    Args:
+        saliency_func (function): a saliency function
+            (e.g., ``torchray.attribution.norm_grad``).
+        model (:class:`torch.nn.Module`): a model.
+        input (:class:`torch.Tensor`): input tensor.
+        target (int or :class:`torch.Tensor`): target label(s).
+        lr (float): learning rate with which to take one SGD step.
+            Default: ``1e-4``.
+        freeze_model (bool): If True, restore original weights to model.
+            Otherwise, allow model to take one SGD step.
+        negate_loss (bool): If True, negate the loss (i.e., to highlight
+            the adversarial information in an image).
+        kwargs: optional arguments for the :attr:`saliency_func` function.
+
+    Returns:
+        saliency_map: the output of :attr:`saliency_func`.
+    """
+
+    # Save original model weights.
     if freeze_model:
-        orig_weights = copy.deepcopy(model.state_dict())
+        orig_weights = model.state_dict()
 
     # Disable gradients for model parameters.
     orig_requires_grad = {}
@@ -26,24 +47,38 @@ def meta_saliency(#saliency_func,
     else:
         orig_is_training = False
 
+    # Prepare optimizer to update model weights.
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+
+    # Do a forward pass.
     y = model(x)
+
+    # Prepare target tensor.
+    if not isinstance(target, torch.Tensor):
+        if isinstance(target, int):
+            y_target = torch.tensor([target],
+                                    dtype=torch.long,
+                                    device=y.device)
+        else:
+            y_target = torch.tensor(target, dtype=torch.long, device=y.device)
+
+    # Handle fully-convolutional case.
     if len(y.shape) == 4:
         y = y.sum((2, 3))
     assert len(y.shape) == 2
 
-    if not isinstance(target, torch.Tensor):
-        if isinstance(target, int):
-            y_target = torch.tensor([target], dtype=torch.long, device=y.device)
-        else:
-            y_target = torch.tensor(target, dtype=torch.long, device=y.device)
+    # Update model weights w.r.t. the cross entropy loss.
     loss = F.cross_entropy(y, y_target)
 
+    # Negate loss to highlight opposite direction.
+    if negate_loss:
+        loss = -1 * loss
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
-    new_weights = model.state_dict()
+    # Compute saliency map on model with updated weights.
+    saliency_map = saliency_func(model, x, target, **kwargs)
 
     # Restore gradient saving for model parameters.
     for name, param in model.named_parameters():
@@ -53,46 +88,20 @@ def meta_saliency(#saliency_func,
     if orig_is_training:
         model.train()
 
+    # Restore model's original weights.
     if freeze_model:
         model.load_state_dict(orig_weights)
 
-    return new_weights
-
-def f2(model, x, class_id, lr=1e-4):
-    base_net = copy.deepcopy(model)
-    output = base_net(x)
-    if len(output.shape) == 4:
-        output = output.permute(0, 2, 3, 1).view(-1, output.shape[1])
-    label = (class_id * torch.ones(output.shape[0])).long().cuda()
-    loss = F.cross_entropy(output, label)
-
-    gradients = torch.autograd.grad(loss, base_net.parameters())
-
-    with torch.no_grad():
-        for w, vw, g in zip(base_net.parameters(), model.parameters(),
-                            gradients):
-            vw.copy_(w - lr * g)
-
-    new_weights  = model.state_dict()
-    orig_weights = base_net.state_dict()
-
-    return new_weights
+    return saliency_map
 
 
 if __name__ == '__main__':
-    from torchray.benchmark import get_example_data
-    from torchray.benchmark import get_model
-    from torchvision import models
-    # _, x, category_id, _ = get_example_data()
-    # model = models.vgg16(pretrained=True).to(x.device)
-    device = torch.device('cuda:0')
-    model = get_model(dataset='voc', convert_to_fully_convolutional=True).to(device)
-    x = torch.randn(1, 3, 224, 300).to(device)
-    category_id = 10
+    from torchray.attribution.norm_grad import norm_grad
+    from torchray.benchmark import get_example_data, plot_example
+    model, x, category_id, _ = get_example_data()
 
-    lr = 0.1
-    z1 = meta_saliency(model, x, category_id, lr=lr)
-    z2 = f2(model, x, category_id, lr=lr)
-    for k in z1.keys():
-        assert torch.abs(z1[k] - z2[k]).sum() == 0
+    saliency_map = meta_saliency(norm_grad, model, x, category_id, saliency_layer='features.22')
+    plot_example(x, saliency_map, 'meta_norm_grad', category_id)
+    import matplotlib.pyplot as plt
+    plt.show()
 
