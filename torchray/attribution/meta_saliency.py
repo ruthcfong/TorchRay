@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn.functional as F
 
@@ -32,7 +33,7 @@ def meta_saliency(saliency_func,
 
     # Save original model weights.
     if freeze_model:
-        orig_weights = model.state_dict()
+        orig_weights = copy.deepcopy(model.state_dict())
 
     # Disable gradients for model parameters.
     orig_requires_grad = {}
