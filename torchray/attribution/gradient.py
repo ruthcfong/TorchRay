@@ -45,3 +45,12 @@ def gradient(*args, context_builder=None, **kwargs):
     """
     assert context_builder is None
     return saliency(*args, **kwargs)
+
+
+def gradient_to_sum_saliency(x):
+    return torch.sum(x.grad, 1, keepdim=True)
+
+
+def gradient_sum(*args, **kwargs):
+    return gradient(*args, gradient_to_saliency=gradient_to_sum_saliency, **kwargs)
+

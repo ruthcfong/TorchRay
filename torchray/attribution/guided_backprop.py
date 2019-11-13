@@ -92,3 +92,7 @@ def guided_backprop(*args, context_builder=GuidedBackpropContext, **kwargs):
     return saliency(*args,
                     context_builder=context_builder,
                     **kwargs)
+
+
+def guided_backprop_sum(*args, **kwargs):
+    return guided_backprop(*args, gradient_to_saliency=gradient_to_sum_saliency, **kwargs)

@@ -62,6 +62,8 @@ def meta_saliency(saliency_func,
                                     device=y.device)
         else:
             y_target = torch.tensor(target, dtype=torch.long, device=y.device)
+    else:
+        y_target = target
 
     # Handle fully-convolutional case.
     if len(y.shape) == 4:

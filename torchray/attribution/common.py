@@ -4,6 +4,7 @@ r"""
 This module defines common code for the backpropagation methods.
 """
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 import weakref
@@ -262,7 +263,7 @@ def get_pointing_gradient(pred_y, y, normalize=True):
     assert isinstance(pred_y, torch.Tensor)
     assert len(pred_y.shape) == 4 or len(pred_y.shape) == 2
     assert pred_y.shape[0] == 1
-    assert isinstance(y, int)
+    assert isinstance(y, np.integer)
     backward_gradient = torch.zeros_like(pred_y)
     backward_gradient[0, y] = torch.exp(pred_y[0, y])
     if normalize:
