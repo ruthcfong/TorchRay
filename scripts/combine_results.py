@@ -6,7 +6,7 @@ import numpy as np
 
 def combine_results(results_dir, out_path):
     results = []
-    for f in os.listdir(results_dir):
+    for f in np.sort(os.listdir(results_dir)):
         results.append(np.loadtxt(os.path.join(results_dir, f), dtype=str))
     results = np.array(results)
     np.savetxt(out_path, results, fmt='%s', delimiter='\n')
