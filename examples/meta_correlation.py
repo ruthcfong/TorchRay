@@ -130,6 +130,8 @@ def meta_correlation(arch="resnet50",
         if False and i % 10 == 0:
             ax.plot(corrs, scores, '.')
             plt.pause(1)
+        if i > 1:
+            break
 
     out_dir = "./data/meta_correlation"
     if not os.path.exists(out_dir):
@@ -138,13 +140,15 @@ def meta_correlation(arch="resnet50",
     prefix = f"{arch}_{method}_{saliency_layer}_{lr:.4f}"
     np.savetxt(os.path.join(out_dir, f"{prefix}_corrs.txt"),
                np.array(corrs),
-               delimiter="\n")
+               delimiter="\n",
+               fmt="%.4f")
     np.savetxt(os.path.join(out_dir, f"{arch}_scores.txt"),
                np.array(scores),
-               delimiter="\n")
+               delimiter="\n",
+               fmt="%.4f")
     np.savetxt(os.path.join(out_dir, f"{arch}_class_ids.txt"),
                np.array(scores),
-               delimter="\n",
+               delimiter="\n",
                fmt="%d")
 
 
