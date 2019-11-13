@@ -156,6 +156,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--batch_size", type=int, default=9)
     parser.add_argument('--plot', action="store_true", default=False)
+    parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--gpu", type=int, default=None)
 
     args = parser.parse_args()
@@ -166,4 +167,5 @@ if __name__ == '__main__':
                      lr=args.lr,
                      batch_size=args.batch_size,
                      plot=args.plot,
+                     num_workers=args.workers,
                      gpu=args.gpu)
