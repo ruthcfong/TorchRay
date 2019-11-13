@@ -32,12 +32,12 @@ import torchray.attribution.extremal_perturbation as elp
 
 # v2: use weights from model finetuned on pascal
 # series = 'attribution_benchmarks_v2'
-series = 'attribution_benchmarks'
+series = 'attribution_benchmarks_accuracy'
 series_dir = os.path.join('data', series)
 log = 0
 seed = 0
-chunk = None # range(1)
-save = True 
+chunk = None #range(1)
+save = True
 
 datasets = [
     'voc_2007',
@@ -228,7 +228,7 @@ weights = {
             'layer4': 0.4420436345646859,
         }
     },
-    'activation_imagenet': {
+    'activation_in': {
         'vgg16': {
             'features.3': 0.1533106022599574,
             'features.8': 0.2196877151286012,
@@ -245,10 +245,18 @@ weights = {
     },
     'accuracy': {
         'resnet50': {
-            'layer1': 0.07792207792207792,
-            'layer2': 0.15584415584415584,
-            'layer3': 0.3181818181818182,
-            'layer4': 0.44805194805194803,
+            'layer1': 0.0777636622102207,
+            'layer2': 0.1120188314949383,
+            'layer3': 0.1960376762879433,
+            'layer4': 0.6141798300068978,
+
+        },
+        'vgg16': {
+            'features.3': 0.0326937514514653,
+            'features.8': 0.1252633500153707,
+            'features.15': 0.2119629074318453,
+            'features.22': 0.3040917640919230,
+            'features.29': 0.3259882270093957,
         }
     }
 }
@@ -258,13 +266,14 @@ accumulation = [
     'product'
 ]
 
-from torchray.attribution.linear_approx import gradient_to_linear_approx_saliency
+def gradient_to_sum_saliency(x):
+    return torch.sum(x.grad, 1, keepdim=True)
 
 def gradient_sum(*args, **kwargs):
-    return gradient(*args, gradient_to_saliency=gradient_to_linear_approx_saliency, **kwargs)
+    return gradient(*args, gradient_to_saliency=gradient_to_sum_saliency, **kwargs)
 
 def guided_backprop_sum(*args, **kwargs):
-    return guided_backprop(*args, gradient_to_saliency=gradient_to_linear_approx_saliency, **kwargs)
+    return guided_backprop(*args, gradient_to_saliency=gradient_to_sum_saliency, **kwargs)
 
 saliency_funcs = {
     'contrastive_excitation_backprop': contrastive_excitation_backprop,
