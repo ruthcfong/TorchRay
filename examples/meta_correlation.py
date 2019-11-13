@@ -153,11 +153,52 @@ def meta_correlation(arch="resnet50",
 
 
 if __name__ == '__main__':
+    archs = ["vgg16", "resnet50"]
+
+    layers = {
+        'vgg16':
+            ['features.29',
+             'features.22',
+             'features.15',
+             'features.8',
+             'features.3',
+             ''],
+        'resnet50':
+            ['layer4',
+             'layer3',
+             'layer2',
+             'layer1',
+             ''
+             ],
+    }
+
+    methods = [
+        'norm_grad',
+        'norm_grad_selective',
+        'gradient',
+        'gradient_sum',
+        'linear_approx',
+        'contrastive_excitation_backprop',
+        'deconvnet',
+        'excitation_backprop',
+        'grad_cam',
+        'guided_backprop',
+        'guided_backprop_sum',
+    ]
+
+    lrs = [
+        1e-2,
+        5e-3,
+        1e-3,
+        5e-4,
+        1e-4,
+    ]
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--arch", type=str, default="resnet50")
-    parser.add_argument("--method", choices=saliency_funcs.keys(), default="gradient")
-    parser.add_argument("--saliency_layer", type=str, default="")
-    parser.add_argument("--lr", type=float, default=1e-4)
+    # parser.add_argument("--arch", type=str, default="resnet50")
+    # parser.add_argument("--method", choices=saliency_funcs.keys(), default="gradient")
+    # parser.add_argument("--saliency_layer", type=str, default="")
+    # parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--batch_size", type=int, default=9)
     parser.add_argument('--plot', action="store_true", default=False)
     parser.add_argument("--workers", type=int, default=4)
@@ -165,11 +206,24 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    meta_correlation(arch=args.arch,
-                     method=args.method,
-                     saliency_layer=args.saliency_layer,
-                     lr=args.lr,
-                     batch_size=args.batch_size,
-                     plot=args.plot,
-                     num_workers=args.workers,
-                     gpu=args.gpu)
+    for a in archs:
+        for m in methods:
+            for l in layers:
+                for lr in lrs:
+                    meta_correlation(arch=args.arch,
+                                     method=args.method,
+                                     saliency_layer=args.saliency_layer,
+                                     lr=args.lr,
+                                     batch_size=args.batch_size,
+                                     plot=args.plot,
+                                     num_workers=args.workers,
+                                     gpu=args.gpu)
+    if False:
+        meta_correlation(arch=args.arch,
+                         method=args.method,
+                         saliency_layer=args.saliency_layer,
+                         lr=args.lr,
+                         batch_size=args.batch_size,
+                         plot=args.plot,
+                         num_workers=args.workers,
+                         gpu=args.gpu)
