@@ -5,6 +5,8 @@ import shutil
 import time
 import warnings
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -307,11 +309,18 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             progress.display(i)
 
 
+SAVE_CLASS_ACCURACIES = True
 def validate(val_loader, model, criterion, args):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
+    if SAVE_CLASS_ACCURACIES:
+        num_classes = 1000
+        class_top1 = [AverageMeter(f"Acc({i})@1", ':6.2f') for i in
+                      range(num_classes)]
+        class_top5 = [AverageMeter(f"Acc({i})@5", ':6.2f') for i in
+                      range(num_classes)]
     progress = ProgressMeter(
         len(val_loader),
         [batch_time, losses, top1, top5],
@@ -337,6 +346,15 @@ def validate(val_loader, model, criterion, args):
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
 
+            if SAVE_CLASS_ACCURACIES:
+                for j, t in enumerate(target):
+                    class_acc1, class_acc5 = accuracy(output[j].unsqueeze(0),
+                                                      target[j].unsqueeze(0),
+                                                      topk=(1, 5))
+                    class_top1[t].update(class_acc1[0], 1)
+                    class_top5[t].update(class_acc5[0], 1)
+
+
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
@@ -347,6 +365,15 @@ def validate(val_loader, model, criterion, args):
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
+
+        if SAVE_CLASS_ACCURACIES:
+            for i in range(num_classes):
+                print(f"* {i}: Acc@1 {class_top1[i].avg:.3f} Acc@5 {class_top5[i].avg:.3f}")
+
+            class_top1_avg = np.array([x.avg for x in class_top1])
+            class_top5_avg = np.array([x.avg for x in class_top5])
+            np.savetxt(f"./data/accuracies/{args.arch}-top1.txt", class_top1_avg, delimiter='\n')
+            np.savetxt(f"./data/accuracies/{args.arch}-top5.txt", class_top5_avg, delimiter='\n')
 
     return top1.avg
 

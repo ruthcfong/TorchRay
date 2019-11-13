@@ -39,6 +39,83 @@ _DEFAULT_CONFIG = {
 _config_read = False
 
 
+class MomentsMeter(object):
+    """
+    Implements Welford's algorithm for computing a running mean and standard
+    deviation as described at:
+    http://www.johndcook.com/standard_deviation.html
+    A Moments object accepts single values or iterables.
+
+    Copied from https://gist.github.com/alexalemi/2151722
+
+    Properties:
+        mean    - returns the mean
+        std     - returns the std
+        meanfull- returns the mean and std of the mean
+
+    Usage:
+        >>> foo = MomentsMeter()
+        >>> foo(range(100))
+        >>> foo
+        <Welford: 49.5 +- 29.0114919759>
+        >>> foo([1]*1000)
+        >>> foo
+        <Welford: 5.40909090909 +- 16.4437417146>
+        >>> foo.mean
+        5.409090909090906
+        >>> foo.std
+        16.44374171455467
+        >>> foo.meanfull
+        (5.409090909090906, 0.4957974674244838)
+    """
+
+    def __init__(self, lst=None):
+        self.k = 0
+        self.M = 0
+        self.S = 0
+
+        self.__call__(lst)
+
+    def update(self, x):
+        if x is None:
+            return
+        newM = self.M + (x - self.M) * 1. / self.k
+        newS = self.S + (x - self.M) * (x - newM)
+        self.M, self.S = newM, newS
+        self.k += 1
+
+    def consume(self, lst):
+        lst = iter(lst)
+        for x in lst:
+            self.update(x)
+
+    def __call__(self, x):
+        if hasattr(x, "__iter__"):
+            self.consume(x)
+        else:
+            self.update(x)
+
+    @property
+    def mean(self):
+        return self.M
+
+    @property
+    def meanfull(self):
+        return self.mean, self.std / math.sqrt(self.k)
+
+    @property
+    def std(self):
+        if self.k == 1:
+            return 0
+        return math.sqrt(self.S / (self.k - 1))
+
+    def __repr__(self):
+        return f"{self.mean} +- {self.std:}"
+
+    def __str__(self):
+        return f"{self.mean} +- {self.std}"
+
+
 def get_config():
     """Read the TorchRay config file.
 
@@ -461,3 +538,28 @@ def imarraysc(tiles,
                                                                  quiet=True,
                                                                  lim=lim)[0]
     return imsc(mosaic, quiet=quiet, interpolation=interpolation)
+
+
+def normalize(x, a_min=0., a_max=1.):
+    """Normalize tensor or array between new min/max values."""
+    assert a_min < a_max
+    x_min = x.min()
+    x_max = x.max()
+    return (a_max - a_min) * (x - x_min) / (x_max - x_min) + a_min
+
+
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
