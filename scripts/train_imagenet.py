@@ -23,7 +23,8 @@ model_names = sorted(name for name in models.__dict__
     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
+parser.add_argument('-d', '--data', metavar='DIR',
+                    default='./data/datasets/imagenet',
                     help='path to dataset')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
@@ -350,10 +351,20 @@ def validate(val_loader, model, criterion, args):
     return top1.avg
 
 
+CHECKPOINT_DIR = "/scratch/local/ssd/ruthfong/models/imagenet"
+EPOCH_FREQ = 5
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    filename = os.path.join(CHECKPOINT_DIR, filename)
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        shutil.copyfile(filename,
+                        os.path.join(CHECKPOINT_DIR, 'model_best.pth.tar'))
+    if (state['epoch'] - 1) % EPOCH_FREQ == 0:
+        print(f"Save model for epoch {state['epoch']}")
+        shutil.copyfile(filename,
+                        os.path.join(CHECKPOINT_DIR,
+                                     f"model_epoch_{state['epoch']:02d}.pth.tar"))
+
 
 
 class AverageMeter(object):
