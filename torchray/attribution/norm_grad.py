@@ -93,8 +93,11 @@ def gradient_to_norm_grad_proper_saliency(x_in,
                            dilation=dilation,
                            padding=padding,
                            stride=stride)
-    act_weight_shape = (x_in.shape[0], 1, x_in.shape[2], x_in.shape[3])
-    act_weight = torch.norm(x_in_unfold, 2, 1, keepdim=True).view(*act_weight_shape)
+    act_weight_shape = (x_out.shape[0], 1, x_out.shape[2], x_out.shape[3])
+    act_weight = torch.norm(x_in_unfold,
+                            2,
+                            1,
+                            keepdim=True).view(*act_weight_shape)
 
     saliency_map = grad_weight * act_weight
 
