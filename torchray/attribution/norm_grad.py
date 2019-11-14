@@ -116,15 +116,15 @@ def norm_grad_proper(*args,
     same arguments and return values.
     """
     return saliency(*args,
-                    saliency_layer,
+                    saliency_layer=saliency_layer,
                     gradient_to_saliency=gradient_to_saliency,
                     use_input_output=use_input_output,
                     **kwargs)
 
 def norm_grad(*args,
-             saliency_layer,
-             gradient_to_saliency=gradient_to_norm_grad_saliency,
-             **kwargs):
+              saliency_layer,
+              gradient_to_saliency=gradient_to_norm_grad_saliency,
+              **kwargs):
     r"""NormGrad method using the virtual identity trick.
 
     The function takes the same arguments as :func:`.common.saliency`, with
