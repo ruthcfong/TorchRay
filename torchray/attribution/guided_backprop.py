@@ -49,6 +49,7 @@ __all__ = ['GuidedBackpropContext', 'guided_backprop']
 import torch
 
 from .common import ReLUContext, saliency
+from .gradient import gradient_to_sum_saliency
 
 
 class GuidedBackpropReLU(torch.autograd.Function):

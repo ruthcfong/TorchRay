@@ -715,6 +715,7 @@ def contrastive_excitation_backprop(model,
     debug_probes = attach_debug_probes(model, debug=debug)
 
     # Get relevant layers.
+    probe_target = 'input' if saliency_layer == '' else 'output'
     saliency_layer = get_module(model, saliency_layer)
     contrast_layer = get_module(model, contrast_layer)
     if classifier_layer is None:
@@ -741,7 +742,7 @@ def contrastive_excitation_backprop(model,
 
         # Forward-backward pass to get positive gradient at the contrastive
         # layer and and backpropagate contrastive gradient to input.
-        probe_saliency = Probe(saliency_layer, target='output')
+        probe_saliency = Probe(saliency_layer, target=probe_target)
         output = model(input)
         output.backward(gradient)
 
@@ -750,7 +751,10 @@ def contrastive_excitation_backprop(model,
         probe_saliency.data[0])
 
     # Resize saliency map.
-    saliency_map = resize_saliency(input, saliency_map, resize, resize_mode)
+    try:
+        saliency_map = resize_saliency(input, saliency_map, resize, resize_mode)
+    except:
+        import pdb; pdb.set_trace();
 
     # Smooth saliency map.
     if smooth > 0:

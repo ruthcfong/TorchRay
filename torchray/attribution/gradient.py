@@ -33,6 +33,7 @@ References:
 
 __all__ = ["gradient"]
 
+import torch
 from .common import saliency
 
 
