@@ -105,12 +105,10 @@ def correlate(arch="resnet50",
                delimiter="\n",
                fmt="%.4f")
 
-    res = [arch, saliency_layer, str(np.mean(corrs)), str(np.std(corrs)), str(len(corrs))]
-    np.savetxt(os.path.join(out_dir, f"{prefix}_corrs_summary.csv"),
-               res,
-               delimiter=",",
-               fmt="%s")
-    print(",".join(res))
+    res = ",".join([arch, saliency_layer, str(np.mean(corrs)), str(np.std(corrs)), str(len(corrs))])
+    with open(os.path.join(out_dir, f"{prefix}_corrs_summary.csv"), "w") as f:
+        f.write(res + "\n")
+    print(res)
 
 
 
@@ -143,7 +141,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if False:
+    if True:
         for a in archs:
             for l in layers[a]:
                 correlate(arch=args.arch,
