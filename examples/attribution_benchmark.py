@@ -133,6 +133,13 @@ weights = {
                 'features.22': 0.82091,
                 'features.29': 0.39528,
              },
+            'gradient_sum': {
+                'features.3': 0.75507,
+                'features.8': 0.76842,
+                'features.15': 0.74177,
+                'features.22': 0.66369,
+                'features.29': 0.55581,
+            },
             'guided_backprop': {
                 'features.3': 0.75383,
                 'features.8': 0.72592,
@@ -140,6 +147,13 @@ weights = {
                 'features.22': 0.73107,
                 'features.29': 0.25494,
              },
+            'guided_backprop_sum': {
+                'features.3': 0.74108,
+                'features.8': 0.74321,
+                'features.15': 0.75111,
+                'features.22': 0.75753,
+                'features.29': 0.50958,
+                },
             'linear_approx': {
                 'features.3': 0.81499,
                 'features.8': 0.83012,
@@ -187,11 +201,23 @@ weights = {
                 'layer3': 0.82786,
                 'layer4': 0.18019,
             },
-            'guided_backprop': {  # 
+            'gradient_sum': {
+                'layer1': 0.79594,
+                'layer2': 0.80046,
+                'layer3': 0.70437,
+                'layer4': 0.06718,
+            },
+            'guided_backprop': {
                 'layer1': 0.76874,
                 'layer2': 0.77696,
                 'layer3': 0.82317,
                 'layer4': 0.18019,
+            },
+            'guided_backprop_sum': {
+                'layer1': 0.26723,
+                'layer2': 0.23333,
+                'layer3': 0.1262,
+                'layer4': 0.06718,
             },
             'linear_approx': {
                 'layer1': 0.83281,
@@ -260,6 +286,15 @@ weights = {
         }
     }
 }
+
+weights_strategies = [
+    'accuracy',
+    'pointing_accuracy',
+    'activation',
+    'activation_in',
+    'linear',
+    'uniform',
+]
 
 accumulation = [
     'sum',
@@ -768,7 +803,8 @@ if __name__ == "__main__":
     parser.add_argument('--datasets', nargs='*', default=datasets)
     parser.add_argument('--archs', nargs='*', default=archs)
     parser.add_argument('--methods', nargs='*', default=methods)
-    parser.add_argument('--weights_strategy', default=None)
+    parser.add_argument('--weights_strategy', nargs='*', default=weights_strategies)
+    parser.add_argument('--use_weights', action='store_true', default=False)
     parser.add_argument('--layers', nargs='*', default=None)
     parser.add_argument('--accumulation', nargs='*', default=accumulation)
     args = parser.parse_args()
@@ -780,7 +816,7 @@ if __name__ == "__main__":
     for d in args.datasets:
         for a in args.archs:
             for m in args.methods:
-                if args.weights_strategy is None:
+                if not args.use_weights:
                     if not provided_layers:
                         args.layers = layers[a]
                     else:
@@ -803,23 +839,24 @@ if __name__ == "__main__":
                         finally:
                             pass
                 else:
-                    for c in args.accumulation:
-                        try:
-                            experiments.append(
-                                Experiment(series=series,
-                                           method=m,
-                                           arch=a,
-                                           dataset=d,
-                                           saliency_layer=None,
-                                           weights_strategy=args.weights_strategy,
-                                           accumulation=c,
-                                           chunk=chunk,
-                                           root=series_dir))
-                        except:
-                            print(f'Error for {m}-{args.weights_strategy}-{c}-{a}-{d}')
-                            pass
-                        finally:
-                            pass
+                    for w in args.weights_strategy:
+                        for c in args.accumulation:
+                            try:
+                                experiments.append(
+                                    Experiment(series=series,
+                                               method=m,
+                                               arch=a,
+                                               dataset=d,
+                                               saliency_layer=None,
+                                               weights_strategy=w,
+                                               accumulation=c,
+                                               chunk=chunk,
+                                               root=series_dir))
+                            except:
+                                print(f'Error for {m}-{args.weights_strategy}-{c}-{a}-{d}')
+                                pass
+                            finally:
+                                pass
 
 
 
