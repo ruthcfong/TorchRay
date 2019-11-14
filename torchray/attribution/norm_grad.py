@@ -42,14 +42,10 @@ from .common import saliency
 
 
 def gradient_to_norm_grad_saliency(x):
-    r"""Convert activation and gradient to a Grad-CAM saliency map.
+    r"""Convert activation and gradient to a NormGrad saliency map.
 
     The tensor :attr:`x` must have a valid gradient ``x.grad``.
     The function then computes the saliency map :math:`s`: given by:
-
-    .. math::
-
-        s_{n1u} = \max\{0, \sum_{c}x_{ncu}\cdot dx_{ncu}\}
 
     Args:
         x (:class:`torch.Tensor`): activation tensor with a valid gradient.
@@ -68,19 +64,71 @@ def gradient_to_norm_grad_saliency(x):
     return saliency_map
 
 
+def gradient_to_norm_grad_proper_saliency(x_in, x_out):
+    r"""Convert activation of an input tensor and gradient of an output tensor
+    to a NormGrad saliency map.
+
+    The tensor :attr:`x_out` must have a valid gradient ``x.grad``.
+
+    Args:
+        x_in (:class:`torch.Tensor`): activation tensor.
+        x_out (:class:`torch.Tensor`): activation tensor with a valid gradient.
+
+    Returns:
+        :class:`torch.Tensor`: saliency map.
+    """
+    # Compute Frobenius norm of gradients.
+    grad_weight = torch.norm(x_out.grad, 2, 1, keepdim=True)
+
+    # Compute Frobenius norm of activations.
+    act_weight = torch.norm(x_in, 2, 1, keepdim=True)
+
+    saliency_map = grad_weight * act_weight
+
+    return saliency_map
+
+
 def gradient_to_norm_grad_selective_saliency(x):
+    r"""Convert activation and gradient to a NormGrad selective saliency map.
+
+    The tensor :attr:`x` must have a valid gradient ``x.grad``.
+    The function then computes the saliency map :math:`s`: given by:
+
+    Args:
+        x (:class:`torch.Tensor`): activation tensor with a valid gradient.
+
+    Returns:
+        :class:`torch.Tensor`: saliency map.
+    """
     return torch.norm(torch.clamp(x * x.grad, min=0), 2, 1,
                       keepdim=True)
 
+
+def norm_grad_proper(*args,
+                     saliency_layer,
+                     gradient_to_saliency=gradient_to_norm_grad_proper_saliency,
+                     use_input_output=True,
+                     **kwargs):
+    r"""NormGrad method, without using the virtual identity trick.
+
+    The function takes the same arguments as :func:`.common.saliency`, with
+    the defaults required to apply the NormGrad method, and supports the
+    same arguments and return values.
+    """
+    return saliency(*args,
+                    saliency_layer,
+                    gradient_to_saliency=gradient_to_saliency,
+                    use_input_output=use_input_output,
+                    **kwargs)
 
 def norm_grad(*args,
              saliency_layer,
              gradient_to_saliency=gradient_to_norm_grad_saliency,
              **kwargs):
-    r"""Grad-CAM method.
+    r"""NormGrad method using the virtual identity trick.
 
     The function takes the same arguments as :func:`.common.saliency`, with
-    the defaults required to apply the Grad-CAM method, and supports the
+    the defaults required to apply the NormGrad method, and supports the
     same arguments and return values.
     """
     return saliency(*args,
@@ -93,11 +141,11 @@ def norm_grad_selective(*args,
                         saliency_layer,
                         gradient_to_saliency=gradient_to_norm_grad_selective_saliency,
                         **kwargs):
-    r"""Grad-CAM method.
+    r"""NormGrad method.
 
     The function takes the same arguments as :func:`.common.saliency`, with
-    the defaults required to apply the Grad-CAM method, and supports the
-    same arguments and return values.
+    the defaults required to apply the NormGrad selective method, and supports
+    the same arguments and return values.
     """
     return saliency(*args,
                     saliency_layer=saliency_layer,

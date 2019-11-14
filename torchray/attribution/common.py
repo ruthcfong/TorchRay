@@ -437,6 +437,7 @@ def saliency(model,
              context_builder=NullContext,
              gradient_to_saliency=gradient_to_saliency,
              get_backward_gradient=get_backward_gradient,
+             use_input_output=False,
              debug=False):
     """Apply a backprop-based attribution method to an image.
 
@@ -535,14 +536,32 @@ def saliency(model,
     else:
         orig_is_training = False
 
+    # Turn off in-place operations.
+    orig_uses_inplace = {}
+    for n, m in model.named_modules():
+        if hasattr(m, "inplace"):
+            orig_uses_inplace[n] = m.inplace
+            m.inplace = False
+
     # Attach debug probes to every module.
     debug_probes = attach_debug_probes(model, debug=debug)
 
     # Attach a probe to the saliency layer.
-    probe_target = 'input' if saliency_layer == '' else 'output'
-    saliency_layer = get_module(model, saliency_layer)
-    assert saliency_layer is not None, 'We could not find the saliency layer'
-    probe = Probe(saliency_layer, target=probe_target)
+    probes = []
+
+    # Use the input and output of a saliency layer to compute a saliency map.
+    if use_input_output:
+        saliency_layer = get_module(model, saliency_layer)
+        assert saliency_layer is not None, 'We could not find the saliency layer'
+        probe_input = Probe(saliency_layer, target="input")
+        probe_output = Probe(saliency_layer, target="output")
+        probes.extend([probe_input, probe_output])
+    else:
+        probe_target = 'input' if saliency_layer == '' else 'output'
+        saliency_layer = get_module(model, saliency_layer)
+        assert saliency_layer is not None, 'We could not find the saliency layer'
+        probe = Probe(saliency_layer, target=probe_target)
+        probes.append(probe)
 
     # Do a forward and backward pass.
     with context_builder():
@@ -551,7 +570,11 @@ def saliency(model,
         output.backward(backward_gradient)
 
     # Get saliency map from gradient.
-    saliency_map = gradient_to_saliency(probe.data[0])
+    if use_input_output:
+        saliency_map = gradient_to_saliency(probe_input.data[0],
+                                            probe_output.data[0])
+    else:
+        saliency_map = gradient_to_saliency(probe.data[0])
 
     # Resize saliency map.
     saliency_map = resize_saliency(input,
@@ -567,8 +590,9 @@ def saliency(model,
             padding_mode='replicate'
         )
 
-    # Remove probe.
-    probe.remove()
+    # Remove probe(s).
+    for p in probes:
+        p.remove()
 
     # Restore gradient saving for model parameters.
     for name, param in model.named_parameters():
@@ -577,6 +601,11 @@ def saliency(model,
     # Restore model's original mode.
     if orig_is_training:
         model.train()
+
+    # Restore in-place operations.
+    for n, m in model.named_modules():
+        if n in orig_uses_inplace:
+            m.inplace = orig_uses_inplace[n]
 
     if debug:
         return saliency_map, debug_probes
