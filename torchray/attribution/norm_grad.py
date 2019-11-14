@@ -38,7 +38,9 @@ References:
 __all__ = ["norm_grad", "norm_grad_selective"]
 
 import torch
-from .common import saliency
+import torch.nn as nn
+import torch.nn.functional as F
+from .common import saliency, get_module
 
 
 def gradient_to_norm_grad_saliency(x):
@@ -64,7 +66,12 @@ def gradient_to_norm_grad_saliency(x):
     return saliency_map
 
 
-def gradient_to_norm_grad_proper_saliency(x_in, x_out):
+def gradient_to_norm_grad_proper_saliency(x_in,
+                                          x_out,
+                                          kernel_size=1,
+                                          dilation=1,
+                                          padding=0,
+                                          stride=1):
     r"""Convert activation of an input tensor and gradient of an output tensor
     to a NormGrad saliency map.
 
@@ -80,8 +87,14 @@ def gradient_to_norm_grad_proper_saliency(x_in, x_out):
     # Compute Frobenius norm of gradients.
     grad_weight = torch.norm(x_out.grad, 2, 1, keepdim=True)
 
-    # Compute Frobenius norm of activations.
-    act_weight = torch.norm(x_in, 2, 1, keepdim=True)
+    # Compute Frobenius norm of unfolded activations.
+    x_in_unfold = F.unfold(x_in,
+                           kernel_size,
+                           dilation=dilation,
+                           padding=padding,
+                           stride=stride)
+    act_weight_shape = (x_in.shape[0], 1, x_in.shape[2], x_in.shape[3])
+    act_weight = torch.norm(x_in_unfold, 2, 1, keepdim=True).view(*act_weight_shape)
 
     saliency_map = grad_weight * act_weight
 
@@ -106,7 +119,6 @@ def gradient_to_norm_grad_selective_saliency(x):
 
 def norm_grad_proper(*args,
                      saliency_layer,
-                     gradient_to_saliency=gradient_to_norm_grad_proper_saliency,
                      use_input_output=True,
                      **kwargs):
     r"""NormGrad method, without using the virtual identity trick.
@@ -115,6 +127,20 @@ def norm_grad_proper(*args,
     the defaults required to apply the NormGrad method, and supports the
     same arguments and return values.
     """
+    saliency_module = get_module(args[0], saliency_layer)
+    assert saliency_module is not None, 'We could not find the saliency_layer'
+    assert isinstance(saliency_module, torch.nn.Conv2d)
+
+    # Set gradient_to_saliency function.
+    grad_kwargs = {
+        "kernel_size": saliency_module.kernel_size,
+        "dilation": saliency_module.dilation,
+        "padding": saliency_module.padding,
+        "stride": saliency_module.stride,
+    }
+    gradient_to_saliency=lambda x_in, x_out: gradient_to_norm_grad_proper_saliency(x_in,
+                                                                                   x_out,
+                                                                                   **grad_kwargs)
     return saliency(*args,
                     saliency_layer=saliency_layer,
                     gradient_to_saliency=gradient_to_saliency,
