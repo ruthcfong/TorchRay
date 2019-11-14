@@ -124,7 +124,7 @@ def norm_grad_proper(*args,
                      saliency_layer,
                      use_input_output=True,
                      **kwargs):
-    r"""NormGrad method, without using the virtual identity trick.
+    r"""NormGrad method without using the virtual identity trick.
 
     The function takes the same arguments as :func:`.common.saliency`, with
     the defaults required to apply the NormGrad method, and supports the
@@ -150,6 +150,7 @@ def norm_grad_proper(*args,
                     use_input_output=use_input_output,
                     **kwargs)
 
+
 def norm_grad(*args,
               saliency_layer,
               gradient_to_saliency=gradient_to_norm_grad_saliency,
@@ -170,7 +171,7 @@ def norm_grad_selective(*args,
                         saliency_layer,
                         gradient_to_saliency=gradient_to_norm_grad_selective_saliency,
                         **kwargs):
-    r"""NormGrad method.
+    r"""NormGrad selective method.
 
     The function takes the same arguments as :func:`.common.saliency`, with
     the defaults required to apply the NormGrad selective method, and supports

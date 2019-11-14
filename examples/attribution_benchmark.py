@@ -21,7 +21,7 @@ from torchray.attribution.grad_cam import grad_cam
 from torchray.attribution.gradient import gradient
 from torchray.attribution.guided_backprop import guided_backprop
 from torchray.attribution.linear_approx import linear_approx
-from torchray.attribution.norm_grad import norm_grad, norm_grad_selective
+from torchray.attribution.norm_grad import norm_grad, norm_grad_selective, norm_grad_proper
 from torchray.attribution.rise import rise
 from torchray.attribution.weighted_saliency import weighted_saliency
 from torchray.benchmark.datasets import get_dataset
@@ -62,6 +62,7 @@ methods = [
     'linear_approx',
     'norm_grad',
     'norm_grad_selective',
+    'norm_grad_proper',
     # 'rise',
     # 'extremal_perturbation'
 ]
@@ -78,6 +79,7 @@ backprop_based = [
     'linear_approx',
     'norm_grad',
     'norm_grad_selective',
+    'norm_grad_proper',
 ]
 
 perturbation_based = [
@@ -322,6 +324,7 @@ saliency_funcs = {
     'linear_approx': linear_approx,
     'norm_grad': norm_grad,
     'norm_grad_selective': norm_grad_selective,
+    'norm_grad_proper': norm_grad_proper,
 }
 
 
