@@ -67,7 +67,7 @@ def meta_saliency(saliency_func,
 
     # Handle fully-convolutional case.
     if len(y.shape) == 4:
-        y = y.sum((2, 3))
+        y = y.mean((2, 3))
     assert len(y.shape) == 2
 
     # Update model weights w.r.t. the cross entropy loss.
