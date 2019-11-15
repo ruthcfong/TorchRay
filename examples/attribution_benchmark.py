@@ -24,6 +24,7 @@ from torchray.attribution.linear_approx import linear_approx
 from torchray.attribution.norm_grad import norm_grad, norm_grad_selective, norm_grad_proper
 from torchray.attribution.rise import rise
 from torchray.attribution.weighted_saliency import weighted_saliency
+from torchray.attribution.meta_saliency import meta_saliency
 from torchray.benchmark.datasets import get_dataset
 from torchray.benchmark.models import get_model, get_transform
 from torchray.benchmark.pointing_game import PointingGameBenchmark
@@ -32,7 +33,7 @@ import torchray.attribution.extremal_perturbation as elp
 
 # v2: use weights from model finetuned on pascal
 # series = 'attribution_benchmarks_v2'
-series = 'attribution_benchmarks_accuracy'
+series = 'attribution_benchmarks_meta'
 series_dir = os.path.join('data', series)
 log = 0
 seed = 0
@@ -177,6 +178,20 @@ weights = {
                 'features.22': 0.84845,
                 'features.29': 0.86022,
              },
+            'norm_grad_meta': {
+                'features.3': 0.78991,
+                'features.8': 0.81163,
+                'features.15': 0.81843,
+                'features.22': 0.81928,
+                'features.29': 0.78212,
+            },
+            'norm_grad_selective_meta': {
+                'features.3': 0.81466,
+                'features.8': 0.81314,
+                'features.15': 0.81639,
+                'features.22': 0.84724,
+                'features.29': 0.86101,
+            },
         },
         'resnet50': {
             'contrastive_excitation_backprop': {
@@ -238,6 +253,18 @@ weights = {
                 'layer2': 0.86304,
                 'layer3': 0.86891,
                 'layer4': 0.87439,
+            },
+            'norm_grad_meta': {
+                'layer1': 0.81596,
+                'layer2': 0.84667,
+                'layer3': 0.85823,
+                'layer4': 0.80883,
+            },
+            'norm_grad_selective_meta': {
+                'layer1': 0.81809,
+                'layer2': 0.8628,
+                'layer3': 0.88088,
+                'layer4': 0.88634,
             },
         },
     },
@@ -555,6 +582,12 @@ class ExperimentExecutor():
                         'resize': image_size,
                         'get_backward_gradient': get_pointing_gradient,
                     }
+                    if self.experiment.use_meta:
+                        saliency_func = lambda m, x, y, **k: meta_saliency(saliency_func,
+                                                                           m,
+                                                                           x,
+                                                                           y,
+                                                                           **k)
                     if self.experiment.method == 'contrastive_excitation_backprop':
                         kwargs['contrast_layer'] = self.contrast_layer
                     if self.experiment.weights_strategy is None:
@@ -566,7 +599,8 @@ class ExperimentExecutor():
                         )
                     else:
                         if self.experiment.weights_strategy == 'pointing_accuracy':
-                            lw = weights[self.experiment.weights_strategy][self.experiment.arch][self.experiment.method]
+                            suffix = "_meta" if self.experiment.use_meta else ""
+                            lw = weights[self.experiment.weights_strategy][self.experiment.arch][self.experiment.method + suffix]
                         elif self.experiment.weights_strategy in ['accuracy', 'activation']:
                             lw = weights[self.experiment.weights_strategy][self.experiment.arch]
                         else:
@@ -729,6 +763,7 @@ class Experiment():
                  saliency_layer=None,
                  weights_strategy=None,
                  accumulation=None,
+                 use_meta=False,
                  root='',
                  chunk=None,
                  boom=False):
@@ -742,6 +777,7 @@ class Experiment():
         self.saliency_layer = saliency_layer
         self.weights_strategy = weights_strategy
         self.accumulation = accumulation
+        self.use_meta = use_meta
         if self.weights_strategy is not None:
             assert self.accumulation is not None
             assert self.saliency_layer is None
@@ -751,12 +787,12 @@ class Experiment():
     def __str__(self):
         if self.weights_strategy is None:
             return (
-                f"{self.method},{self.saliency_layer},{self.arch},{self.dataset},"
+                f"{self.method},{self.use_meta},{self.saliency_layer},{self.arch},{self.dataset},"
                 f"{self.pointing:.5f},{self.pointing_difficult:.5f}"
             )
         else:
             return (
-                f"{self.method},{self.weights_strategy},{self.accumulation},"
+                f"{self.method},{self.use_meta},{self.weights_strategy},{self.accumulation},"
                 f"{self.arch},{self.dataset},{self.pointing:.5f},"
                 f"{self.pointing_difficult:.5f}"
             )
@@ -765,9 +801,9 @@ class Experiment():
     @property
     def name(self):
         if self.weights_strategy is None:
-            return f"{self.method}-{self.saliency_layer}-{self.arch}-{self.dataset}"
+            return f"{self.method}-{self.use_meta}-{self.saliency_layer}-{self.arch}-{self.dataset}"
         else:
-            return f"{self.method}-{self.weights_strategy}-{self.accumulation}-{self.arch}-{self.dataset}"
+            return f"{self.method}-{self.use_meta}-{self.weights_strategy}-{self.accumulation}-{self.arch}-{self.dataset}"
 
     @property
     def path(self):
@@ -810,6 +846,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_weights', action='store_true', default=False)
     parser.add_argument('--layers', nargs='*', default=None)
     parser.add_argument('--accumulation', nargs='*', default=accumulation)
+    parser.add_argument('--use_meta', action='store_true', default=False)
     args = parser.parse_args()
 
     experiments = []
@@ -834,6 +871,7 @@ if __name__ == "__main__":
                                            saliency_layer=l,
                                            weights_strategy=None,
                                            accumulation=None,
+                                           use_meta=args.use_meta,
                                            chunk=chunk,
                                            root=series_dir))
                         except:
@@ -853,6 +891,7 @@ if __name__ == "__main__":
                                                saliency_layer=None,
                                                weights_strategy=w,
                                                accumulation=c,
+                                               use_meta=args.use_meta,
                                                chunk=chunk,
                                                root=series_dir))
                             except:
