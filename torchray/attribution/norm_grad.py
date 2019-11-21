@@ -1,39 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
-"""
-This module provides an implementation of the *NormGrad* method of [NORMGRAD]_
-for saliency visualization. The simplest interface is given by the
-:func:`norm_grad` function:
-
-.. literalinclude:: ../examples/norm_grad.py
-   :language: python
-   :linenos:
-
-Alternatively, it is possible to run the method "manually". NormGrad
-is a variant of the gradient method, applied at an intermediate layer:
-
-.. literalinclude:: ../examples/norm_grad_manual.py
-   :language: python
-   :linenos:
-
-Note that the function :func:`gradient_to_norm_grad_saliency` is used to
-convert activations and gradients to a saliency map.
-
-See also :ref:`backprop` for further examples and discussion.
-
-Theory
-~~~~~~
-
-TODO.
-
-References:
-
-    .. [NORMGRAD] Sylvestre-Alvise Rebuffi, Ruth Fong, Xu Ji, Hakan Bilen,
-                  and Andrea Vedaldi,
-                  *NormGrad: Finding the Pixels that Matter for Training,*
-                  arXiv 2017,
-                  `<https://arxiv.org/pdf/1910.08823.pdf>`__.
-"""
 
 __all__ = ["norm_grad", "norm_grad_selective"]
 

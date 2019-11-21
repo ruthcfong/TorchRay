@@ -1,23 +1,3 @@
-r"""
-This module implements the *sanity check* model parameter randomization test
-of [SANITY]_ for checking if a saliency method is sensitive to model
-parameters. The simplest interface is given by the :func:`sanity_check`
-function:
-
-.. literalinclude:: ../examples/sanity_check.py
-    :language: python
-    :linenos:
-
-Warning:
-    :func:`sanity_check` only randomizes torch.nn.Module objects with
-    learnable weights (i.e., module has weight and bias attributes).
-
-References:
-
-    .. [SANITY] Zeiler and Fergus,
-                *Sanity Checks for Saliency Maps*,
-                NeurIPS 2018.
-"""
 import inspect
 from inspect import signature
 
@@ -124,10 +104,7 @@ def partially_randomize_model(model,
             assert hasattr(module, "weight")
             assert hasattr(module, "bias")
             random_module = get_module(randomized_model, composite_name)
-            try:
-                assert random_module is not None
-            except:
-                 import pdb; pdb.set_trace();
+            assert random_module is not None
             if module.weight is not None:
                 module.weight.data[...] = random_module.weight.data[...]
             if module.bias is not None:
@@ -213,7 +190,7 @@ def sanity_check(x,
             computed by randomizing every learnable modules and list of
             learnable layer names.
     """
-    # TODO(ruthfong): Add batch support.
+    # TODO: Add batch support.
     assert isinstance(x, torch.Tensor)
     assert x.shape[0] == 1
     assert isinstance(y, int)
@@ -276,8 +253,7 @@ def sanity_check(x,
                 else:
                     _, p = spearmanr(torch.abs(curr_saliency.reshape(-1)).cpu().data.numpy(),
                                      torch.abs(bsl_saliency.reshape(-1)).cpu().data.numpy())
-                import pdb; pdb.set_trace();
-            # TODO(ruthfong): add other similarity metrics.
+            # TODO: add other similarity metrics.
             else:
                 assert False
             similarity_stats[similarity_metric].append(p)
@@ -321,5 +297,3 @@ class SanityCheckBenchmark:
                    self.modules_to_run]
             out += f"\n{sim_metric}\t" + "\t".join(res)
         return out
-
-
