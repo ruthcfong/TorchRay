@@ -295,6 +295,13 @@ class ImageFolder(torchvision.datasets.ImageFolder):
         """
         return self.samples[self.selection[i]][0]
 
+    @staticmethod
+    def collate(batch):
+        """Collate function for use in a data loader."""
+        inputs = default_collate([elem[0] for elem in batch])
+        labels = [elem[1] for elem in batch]
+        return inputs, labels
+
 
 class VOCDetection(torchvision.datasets.VOCDetection):
     """PASCAL VOC Detection dataset.

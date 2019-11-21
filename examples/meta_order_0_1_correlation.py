@@ -187,6 +187,8 @@ def meta_correlation(arch="resnet50",
                delimiter="\n",
                fmt="%.4f")
 
+    corrs = np.array(corrs)
+
     res = ",".join([arch,
                     method,
                     saliency_layer,
@@ -194,8 +196,8 @@ def meta_correlation(arch="resnet50",
                     str(epoch),
                     str(lr),
                     str(len(corrs)),
-                    str(np.mean(corrs)),
-                    str(np.std(corrs)),
+                    str(np.mean(corrs[np.isfinite(corrs)])),
+                    str(np.std(corrs[np.isfinite(corrs)])),
                     str(np.mean(scores)),
                     str(np.std(scores))])
 
@@ -276,7 +278,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if True:
+    if False:
         for epoch in range(1, 22):
             meta_correlation(arch=args.arch,
                              method=args.method,

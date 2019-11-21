@@ -263,7 +263,7 @@ def get_pointing_gradient(pred_y, y, normalize=True):
     assert isinstance(pred_y, torch.Tensor)
     assert len(pred_y.shape) == 4 or len(pred_y.shape) == 2
     assert pred_y.shape[0] == 1
-    assert isinstance(y, np.integer)
+    assert isinstance(y, np.integer) or isinstance(y, int)
     backward_gradient = torch.zeros_like(pred_y)
     backward_gradient[0, y] = torch.exp(pred_y[0, y])
     if normalize:

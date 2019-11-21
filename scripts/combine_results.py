@@ -7,6 +7,8 @@ import numpy as np
 def combine_results(results_dir, out_path):
     results = []
     for f in np.sort(os.listdir(results_dir)):
+        if "csv" not in f:
+            continue
         results.append(np.loadtxt(os.path.join(results_dir, f), dtype=str))
     results = np.array(results)
     np.savetxt(out_path, results, fmt='%s', delimiter='\n')

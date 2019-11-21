@@ -258,6 +258,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
+                'acc1': acc1,
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best)
@@ -309,7 +310,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             progress.display(i)
 
 
-SAVE_CLASS_ACCURACIES = True
+SAVE_CLASS_ACCURACIES = False
 def validate(val_loader, model, criterion, args):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -372,21 +373,29 @@ def validate(val_loader, model, criterion, args):
 
             class_top1_avg = np.array([x.avg for x in class_top1])
             class_top5_avg = np.array([x.avg for x in class_top5])
-            np.savetxt(f"./data/accuracies/{args.arch}-top1.txt", class_top1_avg, delimiter='\n')
-            np.savetxt(f"./data/accuracies/{args.arch}-top5.txt", class_top5_avg, delimiter='\n')
+            np.savetxt(f"./data/accuracies/{args.arch}-top1.txt",
+                       class_top1_avg,
+                       delimiter='\n',
+                       fmt='%d')
+            np.savetxt(f"./data/accuracies/{args.arch}-top5.txt",
+                       class_top5_avg,
+                       delimiter='\n',
+                       fmt='%d')
 
     return top1.avg
 
 
 CHECKPOINT_DIR = "/scratch/local/ssd/ruthfong/models/imagenet"
 EPOCH_FREQ = 5
+FIRST_EPOCHS = 20
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     filename = os.path.join(CHECKPOINT_DIR, filename)
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename,
                         os.path.join(CHECKPOINT_DIR, 'model_best.pth.tar'))
-    if (state['epoch'] - 1) % EPOCH_FREQ == 0:
+    if ((state['epoch'] - 1) % EPOCH_FREQ == 0
+        or (state['epoch'] - 1) < FIRST_EPOCHS):
         print(f"Save model for epoch {state['epoch']}")
         shutil.copyfile(filename,
                         os.path.join(CHECKPOINT_DIR,

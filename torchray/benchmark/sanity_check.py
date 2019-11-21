@@ -22,16 +22,27 @@ import inspect
 from inspect import signature
 
 import numpy as np
+from scipy.stats import spearmanr
 
 import torch
 
 from torchvision import models
 
-from attribution.saliency.common import get_module
-from attribution.saliency.excitation_backprop import update_resnet
-from attribution.utils import get_device
+from torchray.attribution.common import get_module
+from torchray.attribution.excitation_backprop import update_resnet
+from torchray.utils import get_device, normalize, MomentsMeter
 
 __all__ = ["module_types_with_weights", "sanity_check"]
+
+
+SPEARMAN_NO_ABS = "spearman-no_abs"
+SPEARMAN_ABS = "spearman_abs"
+
+
+SIMILARITY_METRICS = [
+    SPEARMAN_NO_ABS,
+    SPEARMAN_ABS,
+]
 
 
 def get_modules_with_weights(model):
@@ -178,7 +189,8 @@ def sanity_check(x,
                  randomization_type="cascade",
                  should_update_resnet=False,
                  modules_to_run=None,
-                 verbose=False):
+                 verbose=False,
+                 **kwargs):
     """Run model parameter randomization test.
 
     Args:
@@ -206,13 +218,6 @@ def sanity_check(x,
     assert x.shape[0] == 1
     assert isinstance(y, int)
 
-    # TODO(ruthfong): Debug later.
-    if False:
-        sig = signature(saliency_func)
-        required_parameters = [p for _, p in sig.parameters.items()
-                if p.default == inspect.Parameter.empty]
-        assert len(required_parameters) == 3
-
     device = get_device()
 
     if modules_to_run is None:
@@ -222,6 +227,8 @@ def sanity_check(x,
         modules_with_weights.append(None)
         modules_with_weights = modules_with_weights[::-1]
         modules_to_run = modules_with_weights
+    else:
+        modules_to_run.insert(0, None)
 
     cum_saliency = []
     for i, randomize_blob in enumerate(modules_to_run):
@@ -252,10 +259,67 @@ def sanity_check(x,
         else:
             category_id = y
 
-        saliency = saliency_func(partial_model, x, category_id)
+        saliency = saliency_func(partial_model, x, category_id, **kwargs)
+        norm_saliency = normalize(saliency, a_min=-1, a_max=1)
 
-        cum_saliency.append(saliency)
+        cum_saliency.append(norm_saliency)
 
+    similarity_stats = {sim_metric:[] for sim_metric in SIMILARITY_METRICS}
+
+    bsl_saliency = cum_saliency[0]
+    for i, curr_saliency in enumerate(cum_saliency[1:]):
+        for similarity_metric in similarity_stats.keys():
+            if "spearman" in similarity_metric:
+                if "no_abs" in similarity_metric:
+                    _, p = spearmanr(curr_saliency.reshape(-1).cpu().data.numpy(),
+                                     bsl_saliency.reshape(-1).cpu().data.numpy())
+                else:
+                    _, p = spearmanr(torch.abs(curr_saliency.reshape(-1)).cpu().data.numpy(),
+                                     torch.abs(bsl_saliency.reshape(-1)).cpu().data.numpy())
+                import pdb; pdb.set_trace();
+            # TODO(ruthfong): add other similarity metrics.
+            else:
+                assert False
+            similarity_stats[similarity_metric].append(p)
     cum_saliency = torch.cat(cum_saliency)
 
-    return cum_saliency, modules_to_run
+    return {
+        "similarity_stats": similarity_stats,
+        "saliency_maps": cum_saliency,
+        "modules_to_run": modules_to_run[1:],
+    }
+
+
+class SanityCheckBenchmark:
+    def __init__(self,
+                 modules_to_run,
+                 similarity_metrics=SIMILARITY_METRICS):
+        self.modules_to_run = modules_to_run
+        self.similarity_metrics = similarity_metrics
+        self.running_metrics = {}
+        for sim_metric in self.similarity_metrics:
+            self.running_metrics[sim_metric] = {m: MomentsMeter() for m in
+                                                self.modules_to_run}
+
+    def aggregate(self, results):
+        assert results["modules_to_run"] == self.modules_to_run
+        assert(set(results["similarity_stats"].keys())
+               == set(self.similarity_metrics))
+        for sim_metric in self.similarity_metrics:
+            for i, m in enumerate(self.modules_to_run):
+                res = results["similarity_stats"][sim_metric][i]
+                self.running_metrics[sim_metric][m].update(res)
+
+    @property
+    def metrics(self):
+        return self.running_metrics
+
+    def __str__(self):
+        out = "\t" + "\t".join(self.modules_to_run)
+        for sim_metric in self.similarity_metrics:
+            res = [str(self.running_metrics[sim_metric][m]) for m in
+                   self.modules_to_run]
+            out += f"\n{sim_metric}\t" + "\t".join(res)
+        return out
+
+

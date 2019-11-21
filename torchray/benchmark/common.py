@@ -1,11 +1,13 @@
 import numpy as np
-
 from scipy.stats import spearmanr
+import torch
+import torch.nn as nn
+
 
 import torch
 
 
-def compute_similarity(x, y, similarity_metric="spearman_no_abs"):
+def compute_similarity(x, y, similarity_metric="spearman_no_abs", eps=1e-6):
     """Compute similarity score between two tensors batch-wise.
 
     Args:
@@ -19,6 +21,8 @@ def compute_similarity(x, y, similarity_metric="spearman_no_abs"):
             * numpy array of correlation scores
             * numpy array of p-values
     """
+    x = x + eps
+    y = y + eps
     if isinstance(x, torch.Tensor):
         x = x.cpu().data.numpy()
     if isinstance(y, torch.Tensor):

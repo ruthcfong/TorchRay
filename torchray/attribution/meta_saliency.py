@@ -67,8 +67,17 @@ def meta_saliency(saliency_func,
 
     # Handle fully-convolutional case.
     if len(y.shape) == 4:
-        y = y.mean((2, 3))
+        # Check that batch size = 1.
+        assert y.shape[0] == 1
+
+        y = y.permute(0, 2, 3, 1).view(-1, y.shape[1])
+        y_target = (target * torch.ones(y.shape[0])).long().to(y.device)
     assert len(y.shape) == 2
+
+    if False:
+        if len(y.shape) == 4:
+            y = y.mean((2, 3))
+        assert len(y.shape) == 2
 
     # Update model weights w.r.t. the cross entropy loss.
     loss = F.cross_entropy(y, y_target)

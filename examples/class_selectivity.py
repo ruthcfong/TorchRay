@@ -212,6 +212,8 @@ def meta_correlation(arch="resnet50",
                delimiter="\n",
                fmt="%.4f")
 
+    corrs = np.array(corrs)
+
     res = ",".join([arch,
                     method,
                     str(use_meta),
@@ -220,8 +222,8 @@ def meta_correlation(arch="resnet50",
                     str(epoch),
                     str(lr),
                     str(len(corrs)),
-                    str(np.mean(corrs)),
-                    str(np.std(corrs)),
+                    str(np.mean(corrs[np.isfinite(corrs)])),
+                    str(np.std(corrs[np.isfinite(corrs)])),
                     str(np.mean(scores)),
                     str(np.std(scores))])
 
@@ -243,13 +245,14 @@ def meta_correlation(arch="resnet50",
 
 if __name__ == '__main__':
     archs = ["vgg16", "resnet50"]
+    arches = ["vgg16"]
 
     layers = {
         'vgg16':
             ['',
-             'features.3',
-             'features.8',
-             'features.15',
+             #'features.3',
+             #'features.8',
+             #'features.15',
              'features.22',
              'features.29'],
         'resnet50':
@@ -274,6 +277,8 @@ if __name__ == '__main__':
         'guided_backprop',
         'guided_backprop_sum',
     ]
+
+    methods = ["grad_cam"]
 
     lrs = [
         1e-2,

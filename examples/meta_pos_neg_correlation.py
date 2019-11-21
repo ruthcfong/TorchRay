@@ -31,8 +31,8 @@ from torchray.utils import imsc, imarraysc, accuracy
 from tqdm import tqdm
 
 
+CHECKPOINT_DIR = "/scratch/local/ssd/ruthfong/models/resnet50_checkpoints"
 dataset = 'imagenet'
-subset = 'val'
 
 saliency_funcs = {
     'contrastive_excitation_backprop': contrastive_excitation_backprop,
@@ -69,6 +69,8 @@ def get_subset(dset, num_per_class=5):
 def meta_correlation(arch="resnet50",
                      method="gradient",
                      saliency_layer="",
+                     subset="val",
+                     epoch=None,
                      lr=0.0025,
                      batch_size=1,
                      num_per_class=None,
@@ -86,6 +88,18 @@ def meta_correlation(arch="resnet50",
     model = get_model(arch=arch,
                       dataset=dataset,
                       convert_to_fully_convolutional=False)
+
+    # Load weights from checkpoint.
+    if epoch is not None:
+        assert arch == "resnet50"
+        model = nn.DataParallel(model)
+        checkpoint_path = os.path.join(CHECKPOINT_DIR, f"model_epoch_{epoch:02d}.pth.tar")
+        print(f"Loading from {checkpoint_path}")
+        state_dict = torch.load(checkpoint_path,
+                                map_location=lambda storage, loc: storage)
+        model.load_state_dict(state_dict["state_dict"])
+        model = model.module
+
     model.eval()
     model = model.to(device)
 
@@ -163,7 +177,7 @@ def meta_correlation(arch="resnet50",
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    prefix = f"{arch}_{method}_{saliency_layer}_lr_{lr:.4f}_bs_{batch_size}_nc_{num_per_class}"
+    prefix = f"{arch}_{method}_{saliency_layer}_{subset}_e_{epoch}_lr_{lr:.4f}_bs_{batch_size}_nc_{num_per_class}"
     np.savetxt(os.path.join(out_dir, f"{prefix}_pos_neg_corrs.txt"),
                np.array(corrs),
                delimiter="\n",
@@ -177,6 +191,8 @@ def meta_correlation(arch="resnet50",
     res = ",".join([arch,
                     method,
                     saliency_layer,
+                    subset,
+                    str(epoch),
                     str(lr),
                     str(len(corrs)),
                     str(np.mean(corrs)),
@@ -184,7 +200,7 @@ def meta_correlation(arch="resnet50",
                     str(np.mean(scores)),
                     str(np.std(scores))])
 
-    with open(os.path.join(out_dir, f"{prefix}_order_corrs_summary.csv"), "w") as f:
+    with open(os.path.join(out_dir, f"{prefix}_pos_neg_corrs_summary.csv"), "w") as f:
         f.write(res + "\n")
 
     print(res)
@@ -243,7 +259,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", type=str, default="resnet50")
-    parser.add_argument("--method", choices=saliency_funcs.keys(), default="norm_grad")
+    parser.add_argument("--method", choices=saliency_funcs.keys(), default="norm_grad_selective")
     parser.add_argument("--saliency_layer", type=str, default="layer4")
     parser.add_argument("--lr", type=float, default=0.0025)
     parser.add_argument("--batch_size", type=int, default=1)
@@ -252,10 +268,29 @@ if __name__ == '__main__':
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--gpu", type=int, default=None)
     parser.add_argument("--num_per_class", type=int, default=None)
+    parser.add_argument("--epoch", type=int, default=None)
+    parser.add_argument("--subset",
+                        choices=["train", "val"],
+                        type=str,
+                        default="val")
 
     args = parser.parse_args()
 
-    if False:
+    if True:
+        for epoch in range(1, 22):
+            meta_correlation(arch=args.arch,
+                             method=args.method,
+                             saliency_layer=args.saliency_layer,
+                             epoch=epoch,
+                             subset=args.subset,
+                             lr=args.lr,
+                             batch_size=args.batch_size,
+                             num_per_class=args.num_per_class,
+                             plot=args.plot,
+                             verbose=args.verbose,
+                             num_workers=args.workers,
+                             gpu=args.gpu)
+    elif False:
         for a in archs:
             for m in methods:
                 for l in layers:
@@ -274,6 +309,8 @@ if __name__ == '__main__':
         meta_correlation(arch=args.arch,
                          method=args.method,
                          saliency_layer=args.saliency_layer,
+                         epoch=args.epoch,
+                         subset=args.subset,
                          lr=args.lr,
                          batch_size=args.batch_size,
                          num_per_class=args.num_per_class,
